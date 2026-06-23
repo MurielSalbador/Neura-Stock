@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { signOut } from "@/auth";
 import { NavLinks } from "./nav-links";
+import { UserMenu } from "./user-menu";
 
 const PLAN_LABEL: Record<string, string> = {
   trial:  "Plan Trial",
@@ -118,33 +119,12 @@ export default async function PanelLayout({
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            {/* Notifications */}
-            <button className="relative rounded-lg border border-rail bg-panel2 p-2 text-fade transition-colors hover:text-ink">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-              </svg>
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-neon text-[9px] font-bold text-canvas">
-                3
-              </span>
-            </button>
-
-            {/* User */}
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neon text-xs font-bold text-canvas">
-                {inicial}
-              </div>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium leading-tight text-ink">
-                  {user.name ?? "Usuario"}
-                </p>
-                <p className="text-[10px] capitalize text-fade">
-                  {user.rol?.toLowerCase() ?? "operador"}
-                </p>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-fade">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </div>
+            {/* User menu */}
+            <UserMenu
+              inicial={inicial}
+              nombre={user.name ?? "Usuario"}
+              rol={user.rol?.toLowerCase() ?? "operador"}
+            />
           </div>
         </header>
 

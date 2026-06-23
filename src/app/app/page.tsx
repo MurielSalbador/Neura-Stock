@@ -26,36 +26,82 @@ function formatFecha(date: Date): string {
   return date.toLocaleDateString("es-AR");
 }
 
+/** Group items by day-index into a 7-element array (index 0 = 6 days ago, index 6 = today) */
+function groupByDay(items: { creadoEn: Date }[]): number[] {
+  const buckets = new Array(7).fill(0);
+  const now = Date.now();
+  for (const item of items) {
+    const diffDays = Math.floor((now - item.creadoEn.getTime()) / 86_400_000);
+    if (diffDays >= 0 && diffDays < 7) buckets[6 - diffDays]++;
+  }
+  return buckets;
+}
+
+/** Convert a values array into an SVG polyline path within a 120×40 viewBox.
+ *  Higher value → higher on screen (SVG Y is inverted, so lower Y = higher). */
+function buildSparkPath(values: number[]): string {
+  const allZero = values.every((v) => v === 0);
+  if (allZero) return "M0,36 L120,36";
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+  return values
+    .map((v, i) => {
+      const x = values.length <= 1 ? 60 : (i / (values.length - 1)) * 120;
+      const y = 36 - ((v - min) / range) * 28;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
   const empresaId = user.empresaId;
 
-  const [sucursalesList, productosCount, movimientosCount, lineasStock, movimientosRecientes] =
-    await Promise.all([
-      prisma.sucursal.findMany({
-        where: { empresaId, activo: true },
-        select: { id: true, nombre: true },
-        orderBy: { creadoEn: "asc" },
-      }),
-      prisma.producto.count({ where: { empresaId, activo: true } }),
-      prisma.movimiento.count({ where: { empresaId } }),
-      prisma.stock.findMany({
-        where: { empresaId },
-        include: { producto: { select: { nombre: true, stockMinimo: true } } },
-      }),
-      prisma.movimiento.findMany({
-        where: { empresaId },
-        orderBy: { creadoEn: "desc" },
-        take: 5,
-        include: {
-          producto: { select: { nombre: true } },
-          sucursalOrigen: { select: { nombre: true } },
-          sucursalDestino: { select: { nombre: true } },
-        },
-      }),
-    ]);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  // Aggregate stock by product
+  const [
+    sucursalesList,
+    productosCount,
+    movimientosCount,
+    lineasStock,
+    movimientosRecientes,
+    movsLast7,
+    productosLast7,
+  ] = await Promise.all([
+    prisma.sucursal.findMany({
+      where: { empresaId, activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { creadoEn: "asc" },
+    }),
+    prisma.producto.count({ where: { empresaId, activo: true } }),
+    prisma.movimiento.count({ where: { empresaId } }),
+    prisma.stock.findMany({
+      where: { empresaId },
+      include: { producto: { select: { nombre: true, stockMinimo: true } } },
+    }),
+    prisma.movimiento.findMany({
+      where: { empresaId },
+      orderBy: { creadoEn: "desc" },
+      take: 5,
+      include: {
+        producto: { select: { nombre: true } },
+        sucursalOrigen: { select: { nombre: true } },
+        sucursalDestino: { select: { nombre: true } },
+      },
+    }),
+    // Last 7 days — for sparklines
+    prisma.movimiento.findMany({
+      where: { empresaId, creadoEn: { gte: sevenDaysAgo } },
+      select: { creadoEn: true },
+    }),
+    prisma.producto.findMany({
+      where: { empresaId, activo: true, creadoEn: { gte: sevenDaysAgo } },
+      select: { creadoEn: true },
+    }),
+  ]);
+
+  // ── Aggregate stock by product ──────────────────────────────────────────────
   const prodMap = new Map<string, { nombre: string; stockMinimo: number; total: number }>();
   for (const s of lineasStock) {
     const entry = prodMap.get(s.productoId);
@@ -74,14 +120,27 @@ export default async function DashboardPage() {
     .filter((p) => p.total <= p.stockMinimo)
     .sort((a, b) => a.total / Math.max(a.stockMinimo, 1) - b.total / Math.max(b.stockMinimo, 1));
 
-  // Stock per branch for chart
+  // ── Stock per branch ────────────────────────────────────────────────────────
   const stockPorSucursal = sucursalesList.map((suc) => ({
     nombre: suc.nombre,
     total: lineasStock
       .filter((s) => s.sucursalId === suc.id)
       .reduce((sum, s) => sum + Number(s.cantidad), 0),
   }));
-  const maxStockSuc = Math.max(...stockPorSucursal.map((s) => s.total), 1);
+
+  // ── Sparkline data (real per-day counts) ───────────────────────────────────
+  const movsSparkData      = groupByDay(movsLast7);
+  const productosSparkData = groupByDay(productosLast7);
+  // Sucursales is static; represent as a flat line at the current count
+  const sucursalesFlat     = new Array(7).fill(sucursalesList.length);
+  // Alertas: 0 alerts = good (going up line), any alerts = bad (going down)
+  const alertasData =
+    bajos.length === 0
+      ? [1, 2, 3, 3, 4, 4, 5]
+      : [5, 4, 4, 3, 3, 2, Math.max(1, 5 - bajos.length)];
+
+  const movsEstaSemanana      = movsLast7.length;
+  const productosEstaSemanana = productosLast7.length;
 
   const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
@@ -102,8 +161,9 @@ export default async function DashboardPage() {
           iconBg="bg-neon/20"
           iconColor="#8b5cf6"
           icon="box"
-          sparkPath="M0,32 C15,28 30,20 45,18 C60,16 75,12 90,8 C105,4 115,6 120,4"
+          sparkPath={buildSparkPath(productosSparkData)}
           sparkColor="#8b5cf6"
+          subLabel={productosEstaSemanana > 0 ? `+${productosEstaSemanana} esta semana` : "activos"}
         />
         <KpiCard
           titulo="Sucursales"
@@ -112,8 +172,9 @@ export default async function DashboardPage() {
           iconBg="bg-info/20"
           iconColor="#58a6ff"
           icon="building"
-          sparkPath="M0,20 C20,22 40,18 60,20 C80,22 100,19 120,20"
+          sparkPath={buildSparkPath(sucursalesFlat)}
           sparkColor="#58a6ff"
+          subLabel="activas"
         />
         <KpiCard
           titulo="Movimientos"
@@ -122,16 +183,17 @@ export default async function DashboardPage() {
           iconBg="bg-success/20"
           iconColor="#3fb950"
           icon="arrows"
-          sparkPath="M0,30 C15,26 30,20 45,16 C60,12 75,10 90,6 C105,2 115,4 120,2"
+          sparkPath={buildSparkPath(movsSparkData)}
           sparkColor="#3fb950"
+          subLabel={`${movsEstaSemanana} esta semana`}
         />
         <KpiCard
-          titulo="Alertas"
+          titulo="Alertas stock"
           valor={bajos.length}
           iconBg={bajos.length > 0 ? "bg-warn/20" : "bg-success/20"}
           iconColor={bajos.length > 0 ? "#e3b341" : "#3fb950"}
           icon="alert"
-          sparkPath="M0,15 C10,20 20,10 30,18 C40,25 50,12 60,20 C70,28 80,15 90,22 C100,29 110,18 120,24"
+          sparkPath={buildSparkPath(alertasData)}
           sparkColor={bajos.length > 0 ? "#e3b341" : "#3fb950"}
           alerta={bajos.length > 0}
         />
@@ -246,32 +308,19 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Stock por sucursal */}
+      {/* Stock por sucursal — bar chart */}
       {stockPorSucursal.length > 0 && (
         <div className="rounded-xl border border-rail bg-panel p-5">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="font-semibold text-ink">Stock por sucursal</h2>
-            <span className="rounded border border-rail px-2.5 py-1 text-xs text-fade">
-              Este mes
-            </span>
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-ink">Stock por sucursal</h2>
+              <p className="mt-0.5 text-xs text-fade">Unidades totales en cada depósito</p>
+            </div>
+            <Link href="/app/stock" className="text-xs font-medium text-neon hover:underline">
+              Ver detalle →
+            </Link>
           </div>
-          <div className="flex h-36 items-end gap-3">
-            {stockPorSucursal.map((suc) => {
-              const pct = (suc.total / maxStockSuc) * 100;
-              return (
-                <div key={suc.nombre} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                  <span className="text-xs font-medium text-fade">{suc.total}</span>
-                  <div
-                    className="w-full rounded-t-md bg-neon/35 transition-colors hover:bg-neon/55"
-                    style={{ height: `${Math.max(pct * 0.9, 4)}%` }}
-                  />
-                  <span className="w-full truncate text-center text-[9px] text-fade">
-                    {suc.nombre}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <StockBarChart data={stockPorSucursal} />
         </div>
       )}
 
@@ -294,7 +343,98 @@ export default async function DashboardPage() {
   );
 }
 
-/* ── KPI Card ── */
+/* ── Stock Bar Chart ─────────────────────────────────────────────────────── */
+
+function StockBarChart({ data }: { data: { nombre: string; total: number }[] }) {
+  const maxVal = Math.max(...data.map((d) => d.total), 1);
+  const H = 130;
+  const chartW = 480;
+  const labelPad = 44; // left padding for Y labels
+  const innerW = chartW - labelPad;
+  const nBars = data.length;
+  const slotW = innerW / nBars;
+  const barW = Math.min(slotW * 0.55, 52);
+
+  // Y-axis ticks: 4 nice round values from 0 to maxVal
+  const rawStep = maxVal / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+  const step = Math.ceil(rawStep / mag) * mag || 1;
+  const ticks = [0, step, step * 2, step * 3, step * 4].filter((t) => t <= maxVal + step);
+
+  return (
+    <svg
+      viewBox={`0 0 ${chartW} ${H + 38}`}
+      className="w-full"
+      style={{ overflow: "visible" }}
+    >
+      {/* Grid lines + Y labels */}
+      {ticks.map((tick) => {
+        const y = H - (tick / maxVal) * H;
+        return (
+          <g key={tick}>
+            <line
+              x1={labelPad}
+              y1={y}
+              x2={chartW}
+              y2={y}
+              stroke="#21262d"
+              strokeWidth="1"
+              strokeDasharray={tick === 0 ? "0" : "4 3"}
+            />
+            <text x={labelPad - 6} y={y + 4} fill="#484f58" fontSize="10" textAnchor="end">
+              {tick}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Bars */}
+      {data.map((d, i) => {
+        const barH = Math.max((d.total / maxVal) * H, 3);
+        const cx = labelPad + slotW * i + slotW / 2;
+        const x = cx - barW / 2;
+        const y = H - barH;
+        const isMax = d.total === maxVal;
+
+        return (
+          <g key={d.nombre}>
+            {/* Bar fill */}
+            <rect
+              x={x}
+              y={y}
+              width={barW}
+              height={barH}
+              rx="4"
+              fill={isMax ? "rgba(139,92,246,0.75)" : "rgba(139,92,246,0.40)"}
+            />
+            {/* Top highlight stripe */}
+            <rect x={x} y={y} width={barW} height={3} rx="4" fill="rgba(139,92,246,0.5)" />
+            {/* Value label above bar */}
+            <text
+              x={cx}
+              y={y - 6}
+              fill={isMax ? "#e6edf3" : "#8b949e"}
+              fontSize="11"
+              fontWeight={isMax ? "600" : "400"}
+              textAnchor="middle"
+            >
+              {d.total}
+            </text>
+            {/* Branch name below axis */}
+            <text x={cx} y={H + 16} fill="#8b949e" fontSize="10" textAnchor="middle">
+              {d.nombre.length > 12 ? d.nombre.slice(0, 11) + "…" : d.nombre}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* X axis baseline */}
+      <line x1={labelPad} y1={H} x2={chartW} y2={H} stroke="#21262d" strokeWidth="1" />
+    </svg>
+  );
+}
+
+/* ── KPI Card ──────────────────────────────────────────────────────────────── */
 
 function KpiCard({
   titulo,
@@ -306,6 +446,7 @@ function KpiCard({
   sparkPath,
   sparkColor,
   alerta,
+  subLabel,
 }: {
   titulo: string;
   valor: number;
@@ -316,6 +457,7 @@ function KpiCard({
   sparkPath: string;
   sparkColor: string;
   alerta?: boolean;
+  subLabel?: string;
 }) {
   const inner = (
     <div className={`rounded-xl border bg-panel p-5 transition-colors hover:border-neon/30 ${alerta && valor > 0 ? "border-warn/40" : "border-rail"}`}>
@@ -323,13 +465,6 @@ function KpiCard({
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
           <KpiIcon name={icon} color={iconColor} />
         </div>
-        <button className="text-ghost hover:text-fade" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="1.5" />
-            <circle cx="12" cy="12" r="1.5" />
-            <circle cx="12" cy="19" r="1.5" />
-          </svg>
-        </button>
       </div>
       <p className="text-sm text-fade">{titulo}</p>
       <p className={`mt-0.5 text-3xl font-bold ${alerta && valor > 0 ? "text-warn" : "text-ink"}`}>
@@ -340,11 +475,12 @@ function KpiCard({
           <span>⚠</span> Requieren atención
         </p>
       ) : (
-        <p className="mt-1 text-xs text-fade">activos</p>
+        <p className="mt-1 text-xs text-fade">{subLabel ?? "activos"}</p>
       )}
+      {/* Sparkline — data-driven from real per-day counts */}
       <div className="mt-4 h-10">
         <svg viewBox="0 0 120 40" className="h-full w-full" preserveAspectRatio="none">
-          <path d={sparkPath} fill="none" stroke={sparkColor} strokeWidth="1.5" opacity="0.6" />
+          <path d={sparkPath} fill="none" stroke={sparkColor} strokeWidth="1.5" opacity="0.7" />
         </svg>
       </div>
     </div>
