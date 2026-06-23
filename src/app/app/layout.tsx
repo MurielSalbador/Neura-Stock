@@ -46,7 +46,7 @@ export default async function PanelLayout({
 
         {/* Nav */}
         <div className="flex-1 px-3 py-4">
-          <NavLinks />
+          <NavLinks rol={user.rol} />
         </div>
 
         {/* Config + Sign out */}

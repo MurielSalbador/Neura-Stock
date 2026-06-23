@@ -60,6 +60,13 @@ export default async function DashboardPage() {
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+  // Filter recent movements by role:
+  // VENDEDOR → only their own | ENCARGADO/ADMIN → all
+  const movWhere =
+    user.rol === "VENDEDOR"
+      ? { empresaId, usuarioId: user.id }
+      : { empresaId };
+
   const [
     sucursalesList,
     productosCount,
@@ -75,13 +82,13 @@ export default async function DashboardPage() {
       orderBy: { creadoEn: "asc" },
     }),
     prisma.producto.count({ where: { empresaId, activo: true } }),
-    prisma.movimiento.count({ where: { empresaId } }),
+    prisma.movimiento.count({ where: movWhere }),
     prisma.stock.findMany({
       where: { empresaId },
       include: { producto: { select: { nombre: true, stockMinimo: true } } },
     }),
     prisma.movimiento.findMany({
-      where: { empresaId },
+      where: movWhere,
       orderBy: { creadoEn: "desc" },
       take: 5,
       include: {
@@ -92,7 +99,7 @@ export default async function DashboardPage() {
     }),
     // Last 7 days — for sparklines
     prisma.movimiento.findMany({
-      where: { empresaId, creadoEn: { gte: sevenDaysAgo } },
+      where: { ...movWhere, creadoEn: { gte: sevenDaysAgo } },
       select: { creadoEn: true },
     }),
     prisma.producto.findMany({

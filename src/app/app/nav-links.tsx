@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+const NAV_BASE = [
   { href: "/app",             label: "Dashboard",   exact: true,  Icon: HomeIcon },
   { href: "/app/stock",       label: "Inventario",  exact: false, Icon: GridIcon },
   { href: "/app/productos",   label: "Productos",   exact: false, Icon: BoxIcon },
@@ -11,11 +11,18 @@ const NAV = [
   { href: "/app/sucursales",  label: "Sucursales",  exact: false, Icon: BuildingIcon },
 ];
 
-export function NavLinks() {
+const NAV_ADMIN = { href: "/app/admin", label: "Equipo", exact: false, Icon: UsersIcon };
+
+export function NavLinks({ rol }: { rol?: string }) {
   const pathname = usePathname();
+  const nav = [
+    ...NAV_BASE,
+    ...(rol === "ADMIN" || rol === "ENCARGADO" ? [NAV_ADMIN] : []),
+  ];
+
   return (
     <nav className="space-y-0.5">
-      {NAV.map(({ href, label, exact, Icon }) => {
+      {nav.map(({ href, label, exact, Icon }) => {
         const active = exact ? pathname === href : pathname.startsWith(href);
         return (
           <Link
@@ -78,6 +85,16 @@ function BuildingIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18ZM6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
       <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
