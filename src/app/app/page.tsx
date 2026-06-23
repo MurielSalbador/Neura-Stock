@@ -346,27 +346,26 @@ export default async function DashboardPage() {
 /* ── Stock Bar Chart ─────────────────────────────────────────────────────── */
 
 function StockBarChart({ data }: { data: { nombre: string; total: number }[] }) {
-  const maxVal = Math.max(...data.map((d) => d.total), 1);
+  // Clamp negatives to 0 for bar height; keep real value for label
+  const displayData = data.map((d) => ({ ...d, display: Math.max(d.total, 0) }));
+  const maxVal = Math.max(...displayData.map((d) => d.display), 1);
+
   const H = 130;
   const chartW = 480;
-  const labelPad = 44; // left padding for Y labels
+  const labelPad = 40;
   const innerW = chartW - labelPad;
   const nBars = data.length;
   const slotW = innerW / nBars;
   const barW = Math.min(slotW * 0.55, 52);
 
-  // Y-axis ticks: 4 nice round values from 0 to maxVal
-  const rawStep = maxVal / 4;
-  const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
-  const step = Math.ceil(rawStep / mag) * mag || 1;
-  const ticks = [0, step, step * 2, step * 3, step * 4].filter((t) => t <= maxVal + step);
+  // Integer ticks only — avoids floating-point label overflow
+  const tickStep = Math.max(Math.ceil(maxVal / 4), 1);
+  const ticks = [0, tickStep, tickStep * 2, tickStep * 3, tickStep * 4].filter(
+    (t) => t <= maxVal + tickStep,
+  );
 
   return (
-    <svg
-      viewBox={`0 0 ${chartW} ${H + 38}`}
-      className="w-full"
-      style={{ overflow: "visible" }}
-    >
+    <svg viewBox={`0 0 ${chartW} ${H + 38}`} className="w-full">
       {/* Grid lines + Y labels */}
       {ticks.map((tick) => {
         const y = H - (tick / maxVal) * H;
@@ -389,38 +388,47 @@ function StockBarChart({ data }: { data: { nombre: string; total: number }[] }) 
       })}
 
       {/* Bars */}
-      {data.map((d, i) => {
-        const barH = Math.max((d.total / maxVal) * H, 3);
+      {displayData.map((d, i) => {
+        const barH = d.display > 0 ? Math.max((d.display / maxVal) * H, 4) : 0;
         const cx = labelPad + slotW * i + slotW / 2;
         const x = cx - barW / 2;
         const y = H - barH;
-        const isMax = d.total === maxVal;
+        const isMax = d.display === maxVal && maxVal > 0;
 
         return (
           <g key={d.nombre}>
-            {/* Bar fill */}
-            <rect
-              x={x}
-              y={y}
-              width={barW}
-              height={barH}
-              rx="4"
-              fill={isMax ? "rgba(139,92,246,0.75)" : "rgba(139,92,246,0.40)"}
-            />
-            {/* Top highlight stripe */}
-            <rect x={x} y={y} width={barW} height={3} rx="4" fill="rgba(139,92,246,0.5)" />
-            {/* Value label above bar */}
+            {barH > 0 && (
+              <>
+                <rect
+                  x={x}
+                  y={y}
+                  width={barW}
+                  height={barH}
+                  rx="4"
+                  fill={isMax ? "rgba(139,92,246,0.75)" : "rgba(139,92,246,0.40)"}
+                />
+                <rect
+                  x={x}
+                  y={y}
+                  width={barW}
+                  height={Math.min(3, barH)}
+                  rx="4"
+                  fill="rgba(179,132,255,0.5)"
+                />
+              </>
+            )}
+            {/* Value label — shows real total even when negative */}
             <text
               x={cx}
-              y={y - 6}
-              fill={isMax ? "#e6edf3" : "#8b949e"}
+              y={barH > 0 ? y - 6 : H - 14}
+              fill={d.total < 0 ? "#f85149" : isMax ? "#e6edf3" : "#8b949e"}
               fontSize="11"
               fontWeight={isMax ? "600" : "400"}
               textAnchor="middle"
             >
               {d.total}
             </text>
-            {/* Branch name below axis */}
+            {/* Branch name */}
             <text x={cx} y={H + 16} fill="#8b949e" fontSize="10" textAnchor="middle">
               {d.nombre.length > 12 ? d.nombre.slice(0, 11) + "…" : d.nombre}
             </text>
