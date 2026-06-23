@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { signOut } from "@/auth";
+import { NavLinks } from "./nav-links";
 
-const NAV = [
-  { href: "/app",             label: "Inicio" },
-  { href: "/app/stock",       label: "Stock" },
-  { href: "/app/productos",   label: "Productos" },
-  { href: "/app/movimientos", label: "Movimientos" },
-  { href: "/app/sucursales",  label: "Sucursales" },
-];
+const PLAN_LABEL: Record<string, string> = {
+  trial:  "Plan Trial",
+  basico: "Plan Básico",
+  pro:    "Plan Pro",
+};
 
 export default async function PanelLayout({
   children,
@@ -16,57 +16,141 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+  const empresa = await prisma.empresa.findUnique({
+    where: { id: user.empresaId },
+    select: { plan: true },
+  });
+
+  const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
   return (
     <div className="flex min-h-screen bg-canvas">
-      {/* Sidebar */}
-      <aside className="flex w-56 flex-col border-r border-rail bg-panel">
 
-        {/* Brand */}
-        <div className="border-b border-rail px-4 py-5 space-y-2">
-          <p className="font-mono text-sm font-bold tracking-[0.25em] text-neon brand-glow uppercase">
-            STOCK-NEURA
-          </p>
-          <p className="truncate font-mono text-[11px] text-fade">
-            {user.name ?? user.email}
-          </p>
-          <span className="inline-block border border-neon/30 bg-neon/10 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-neon">
-            {user.rol}
-          </span>
+      {/* ── Sidebar ── */}
+      <aside className="flex w-64 shrink-0 flex-col border-r border-rail bg-panel">
+
+        {/* Logo */}
+        <div className="flex items-center gap-3 border-b border-rail px-5 py-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neon/20">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+              <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-wide text-ink">NEURA</p>
+            <p className="text-[10px] uppercase tracking-widest text-fade">Stock System</p>
+          </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 space-y-0.5 p-2 pt-3">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block border-l-2 border-transparent px-3 py-2 font-mono text-sm text-fade transition-colors hover:border-neon/50 hover:bg-neon/5 hover:text-neon"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex-1 px-3 py-4">
+          <NavLinks />
+        </div>
 
-        {/* Sign out */}
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-          className="border-t border-rail p-2"
-        >
-          <button
-            type="submit"
-            className="w-full px-3 py-2 text-left font-mono text-xs text-ghost transition-colors hover:text-fade"
+        {/* Config + Sign out */}
+        <div className="space-y-0.5 border-t border-rail px-3 py-3">
+          <Link
+            href="#"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
           >
-            Cerrar sesión
-          </button>
-        </form>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Configuración
+          </Link>
+
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/login" });
+            }}
+          >
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+              Salir
+            </button>
+          </form>
+        </div>
+
+        {/* Plan badge */}
+        <div className="border-t border-rail p-4">
+          <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neon/20">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-ink">
+                {PLAN_LABEL[empresa?.plan ?? "trial"] ?? "Plan Trial"}
+              </p>
+              <p className="truncate text-[10px] text-fade">
+                {user.name ?? user.email}
+              </p>
+            </div>
+          </div>
+        </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 p-6">{children}</main>
+      {/* ── Right side ── */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+
+        {/* Top bar */}
+        <header className="flex items-center gap-4 border-b border-rail bg-panel px-6 py-3">
+          <div className="relative max-w-md flex-1">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-ghost">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar productos, movimientos..."
+              readOnly
+              className="w-full cursor-default rounded-lg border border-rail bg-panel2 py-2 pl-10 pr-4 text-sm transition-colors"
+            />
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
+            {/* Notifications */}
+            <button className="relative rounded-lg border border-rail bg-panel2 p-2 text-fade transition-colors hover:text-ink">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-neon text-[9px] font-bold text-canvas">
+                3
+              </span>
+            </button>
+
+            {/* User */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neon text-xs font-bold text-canvas">
+                {inicial}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-medium leading-tight text-ink">
+                  {user.name ?? "Usuario"}
+                </p>
+                <p className="text-[10px] capitalize text-fade">
+                  {user.rol?.toLowerCase() ?? "operador"}
+                </p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-fade">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 overflow-auto p-6">{children}</main>
+      </div>
     </div>
   );
 }

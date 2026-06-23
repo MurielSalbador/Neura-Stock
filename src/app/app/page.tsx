@@ -2,114 +2,388 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
+const TIPO_LABEL: Record<string, string> = {
+  ENTRADA:       "Entrada de stock",
+  SALIDA:        "Salida de stock",
+  TRANSFERENCIA: "Transferencia",
+  AJUSTE:        "Ajuste",
+};
+
+const TIPO_STYLE: Record<string, { bg: string; text: string }> = {
+  ENTRADA:       { bg: "bg-success/15", text: "text-success" },
+  SALIDA:        { bg: "bg-danger/15",  text: "text-danger" },
+  TRANSFERENCIA: { bg: "bg-warn/15",    text: "text-warn" },
+  AJUSTE:        { bg: "bg-ghost/15",   text: "text-fade" },
+};
+
+function formatFecha(date: Date): string {
+  const ahora = new Date();
+  const ayer = new Date(ahora);
+  ayer.setDate(ayer.getDate() - 1);
+  const hora = date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === ahora.toDateString()) return `Hoy, ${hora}`;
+  if (date.toDateString() === ayer.toDateString()) return `Ayer, ${hora}`;
+  return date.toLocaleDateString("es-AR");
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
   const empresaId = user.empresaId;
 
-  const [sucursales, productos, movimientos, lineasStock] = await Promise.all([
-    prisma.sucursal.count({ where: { empresaId, activo: true } }),
-    prisma.producto.count({ where: { empresaId, activo: true } }),
-    prisma.movimiento.count({ where: { empresaId } }),
-    prisma.stock.findMany({
-      where: { empresaId },
-      include: { producto: { select: { nombre: true, stockMinimo: true } } },
-    }),
-  ]);
+  const [sucursalesList, productosCount, movimientosCount, lineasStock, movimientosRecientes] =
+    await Promise.all([
+      prisma.sucursal.findMany({
+        where: { empresaId, activo: true },
+        select: { id: true, nombre: true },
+        orderBy: { creadoEn: "asc" },
+      }),
+      prisma.producto.count({ where: { empresaId, activo: true } }),
+      prisma.movimiento.count({ where: { empresaId } }),
+      prisma.stock.findMany({
+        where: { empresaId },
+        include: { producto: { select: { nombre: true, stockMinimo: true } } },
+      }),
+      prisma.movimiento.findMany({
+        where: { empresaId },
+        orderBy: { creadoEn: "desc" },
+        take: 5,
+        include: {
+          producto: { select: { nombre: true } },
+          sucursalOrigen: { select: { nombre: true } },
+          sucursalDestino: { select: { nombre: true } },
+        },
+      }),
+    ]);
 
-  const bajos = lineasStock.filter(
-    (s) => Number(s.cantidad) <= Number(s.producto.stockMinimo),
-  );
+  // Aggregate stock by product
+  const prodMap = new Map<string, { nombre: string; stockMinimo: number; total: number }>();
+  for (const s of lineasStock) {
+    const entry = prodMap.get(s.productoId);
+    if (entry) {
+      entry.total += Number(s.cantidad);
+    } else {
+      prodMap.set(s.productoId, {
+        nombre: s.producto.nombre,
+        stockMinimo: Number(s.producto.stockMinimo),
+        total: Number(s.cantidad),
+      });
+    }
+  }
+
+  const bajos = [...prodMap.values()]
+    .filter((p) => p.total <= p.stockMinimo)
+    .sort((a, b) => a.total / Math.max(a.stockMinimo, 1) - b.total / Math.max(b.stockMinimo, 1));
+
+  // Stock per branch for chart
+  const stockPorSucursal = sucursalesList.map((suc) => ({
+    nombre: suc.nombre,
+    total: lineasStock
+      .filter((s) => s.sucursalId === suc.id)
+      .reduce((sum, s) => sum + Number(s.cantidad), 0),
+  }));
+  const maxStockSuc = Math.max(...stockPorSucursal.map((s) => s.total), 1);
+
+  const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-mono text-xl font-bold text-ink">
-          Hola, {user.name ?? "operador"} —
-        </h1>
-        <p className="font-mono text-xs text-fade uppercase tracking-widest">
-          // resumen del negocio
-        </p>
+      {/* Header */}
+      <header>
+        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+        <p className="mt-0.5 text-sm text-fade">Resumen general del negocio</p>
       </header>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tarjeta titulo="Sucursales"    valor={sucursales}    href="/app/sucursales" />
-        <Tarjeta titulo="Productos"     valor={productos}     href="/app/productos" />
-        <Tarjeta titulo="Movimientos"   valor={movimientos}   href="/app/movimientos" />
-        <Tarjeta titulo="Alertas stock" valor={bajos.length}  alerta={bajos.length > 0} />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiCard
+          titulo="Productos"
+          valor={productosCount}
+          href="/app/productos"
+          iconBg="bg-neon/20"
+          iconColor="#8b5cf6"
+          icon="box"
+          sparkPath="M0,32 C15,28 30,20 45,18 C60,16 75,12 90,8 C105,4 115,6 120,4"
+          sparkColor="#8b5cf6"
+        />
+        <KpiCard
+          titulo="Sucursales"
+          valor={sucursalesList.length}
+          href="/app/sucursales"
+          iconBg="bg-info/20"
+          iconColor="#58a6ff"
+          icon="building"
+          sparkPath="M0,20 C20,22 40,18 60,20 C80,22 100,19 120,20"
+          sparkColor="#58a6ff"
+        />
+        <KpiCard
+          titulo="Movimientos"
+          valor={movimientosCount}
+          href="/app/movimientos"
+          iconBg="bg-success/20"
+          iconColor="#3fb950"
+          icon="arrows"
+          sparkPath="M0,30 C15,26 30,20 45,16 C60,12 75,10 90,6 C105,2 115,4 120,2"
+          sparkColor="#3fb950"
+        />
+        <KpiCard
+          titulo="Alertas"
+          valor={bajos.length}
+          iconBg={bajos.length > 0 ? "bg-warn/20" : "bg-success/20"}
+          iconColor={bajos.length > 0 ? "#e3b341" : "#3fb950"}
+          icon="alert"
+          sparkPath="M0,15 C10,20 20,10 30,18 C40,25 50,12 60,20 C70,28 80,15 90,22 C100,29 110,18 120,24"
+          sparkColor={bajos.length > 0 ? "#e3b341" : "#3fb950"}
+          alerta={bajos.length > 0}
+        />
       </div>
 
-      {/* CTA vacío */}
-      {productos === 0 && (
-        <div className="border border-dashed border-rail bg-panel p-6 text-center space-y-3">
-          <p className="font-mono text-sm font-bold text-ink">
-            Todavía no cargaste productos
-          </p>
-          <p className="font-mono text-xs text-fade">
+      {/* Mid section: low stock + recent movements */}
+      <div className="grid gap-4 lg:grid-cols-2">
+
+        {/* Productos con stock bajo */}
+        <div className="rounded-xl border border-rail bg-panel">
+          <div className="flex items-center justify-between border-b border-rail px-5 py-4">
+            <div className="flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e3b341" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <h2 className="font-semibold text-ink">Productos con stock bajo</h2>
+            </div>
+            <Link href="/app/stock" className="text-xs font-medium text-neon hover:underline">
+              Ver todos
+            </Link>
+          </div>
+          <div className="divide-y divide-rail">
+            {bajos.slice(0, 5).map((p) => {
+              const critico = p.total <= p.stockMinimo * 0.3;
+              return (
+                <div key={p.nombre} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${critico ? "bg-danger/15 text-danger" : "bg-warn/15 text-warn"}`}>
+                    {p.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{p.nombre}</p>
+                    <p className={`text-xs ${critico ? "text-danger" : "text-warn"}`}>
+                      Stock actual: {p.total}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-xs text-fade">Mín: {p.stockMinimo}</p>
+                  <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${critico ? "bg-danger/15 text-danger" : "bg-warn/15 text-warn"}`}>
+                    {critico ? "Crítico" : "Bajo"}
+                  </span>
+                  <Link
+                    href="/app/movimientos"
+                    className="shrink-0 rounded-lg bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/20"
+                  >
+                    Reponer
+                  </Link>
+                </div>
+              );
+            })}
+            {bajos.length === 0 && (
+              <p className="px-5 py-8 text-center text-sm text-fade">
+                Todo el stock está en orden ✓
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Últimos movimientos */}
+        <div className="rounded-xl border border-rail bg-panel">
+          <div className="flex items-center justify-between border-b border-rail px-5 py-4">
+            <h2 className="font-semibold text-ink">Últimos movimientos</h2>
+            <Link href="/app/movimientos" className="text-xs font-medium text-neon hover:underline">
+              Ver todos
+            </Link>
+          </div>
+          <div className="divide-y divide-rail">
+            {movimientosRecientes.map((m) => {
+              const style = TIPO_STYLE[m.tipo] ?? { bg: "bg-ghost/15", text: "text-fade" };
+              const signo = m.tipo === "ENTRADA" ? "+" : m.tipo === "SALIDA" ? "-" : "";
+              const sucursal = m.sucursalDestino?.nombre ?? m.sucursalOrigen?.nombre ?? "—";
+              return (
+                <div key={m.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
+                    {m.tipo === "ENTRADA" ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}>
+                        <path d="M12 5v14M5 12l7 7 7-7" />
+                      </svg>
+                    ) : m.tipo === "SALIDA" ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}>
+                        <path d="M12 19V5M5 12l7-7 7 7" />
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}>
+                        <path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink">{TIPO_LABEL[m.tipo]}</p>
+                    <p className="text-xs text-fade">{sucursal}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 text-right">
+                    <p className="truncate text-sm text-ink">{m.producto.nombre}</p>
+                    <p className={`text-xs font-medium ${style.text}`}>
+                      {signo}{Number(m.cantidad)} unidades
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-xs text-fade">{formatFecha(m.creadoEn)}</p>
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neon text-[11px] font-bold text-canvas">
+                    {inicial}
+                  </div>
+                </div>
+              );
+            })}
+            {movimientosRecientes.length === 0 && (
+              <p className="px-5 py-8 text-center text-sm text-fade">
+                Sin movimientos todavía
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Stock por sucursal */}
+      {stockPorSucursal.length > 0 && (
+        <div className="rounded-xl border border-rail bg-panel p-5">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="font-semibold text-ink">Stock por sucursal</h2>
+            <span className="rounded border border-rail px-2.5 py-1 text-xs text-fade">
+              Este mes
+            </span>
+          </div>
+          <div className="flex h-36 items-end gap-3">
+            {stockPorSucursal.map((suc) => {
+              const pct = (suc.total / maxStockSuc) * 100;
+              return (
+                <div key={suc.nombre} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                  <span className="text-xs font-medium text-fade">{suc.total}</span>
+                  <div
+                    className="w-full rounded-t-md bg-neon/35 transition-colors hover:bg-neon/55"
+                    style={{ height: `${Math.max(pct * 0.9, 4)}%` }}
+                  />
+                  <span className="w-full truncate text-center text-[9px] text-fade">
+                    {suc.nombre}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state CTA */}
+      {productosCount === 0 && (
+        <div className="rounded-xl border border-dashed border-rail bg-panel p-8 text-center space-y-3">
+          <p className="text-base font-semibold text-ink">Todavía no cargaste productos</p>
+          <p className="text-sm text-fade">
             Empezá agregando tu catálogo para controlar el stock por sucursal.
           </p>
           <Link
             href="/app/productos"
-            className="inline-block border border-neon/60 bg-neon/10 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon transition-colors hover:bg-neon/20"
+            className="inline-block rounded-lg bg-neon/15 px-5 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25"
           >
             Cargar productos →
           </Link>
         </div>
       )}
-
-      {/* Alertas */}
-      {bajos.length > 0 && (
-        <section className="border border-danger/30 bg-panel">
-          <div className="border-b border-danger/20 px-4 py-3">
-            <h2 className="font-mono text-xs font-bold uppercase tracking-widest text-danger glow-danger">
-              !! Productos con stock bajo
-            </h2>
-          </div>
-          <ul className="divide-y divide-rail">
-            {bajos.slice(0, 10).map((s) => (
-              <li key={s.id} className="flex justify-between px-4 py-2.5 font-mono text-sm">
-                <span className="text-ink">{s.producto.nombre}</span>
-                <span className="font-bold text-danger glow-danger">{Number(s.cantidad)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
 
-function Tarjeta({
+/* ── KPI Card ── */
+
+function KpiCard({
   titulo,
   valor,
   href,
+  iconBg,
+  iconColor,
+  icon,
+  sparkPath,
+  sparkColor,
   alerta,
 }: {
   titulo: string;
   valor: number;
   href?: string;
+  iconBg: string;
+  iconColor: string;
+  icon: "box" | "building" | "arrows" | "alert";
+  sparkPath: string;
+  sparkColor: string;
   alerta?: boolean;
 }) {
-  const contenido = (
-    <div
-      className={`border bg-panel p-4 transition-colors ${
-        alerta
-          ? "border-danger/50 hover:border-danger/70"
-          : "border-rail hover:border-neon/30"
-      }`}
-    >
-      <p className="font-mono text-[10px] uppercase tracking-widest text-fade">
-        {titulo}
+  const inner = (
+    <div className={`rounded-xl border bg-panel p-5 transition-colors hover:border-neon/30 ${alerta && valor > 0 ? "border-warn/40" : "border-rail"}`}>
+      <div className="mb-4 flex items-start justify-between">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
+          <KpiIcon name={icon} color={iconColor} />
+        </div>
+        <button className="text-ghost hover:text-fade" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.5" />
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="12" cy="19" r="1.5" />
+          </svg>
+        </button>
+      </div>
+      <p className="text-sm text-fade">{titulo}</p>
+      <p className={`mt-0.5 text-3xl font-bold ${alerta && valor > 0 ? "text-warn" : "text-ink"}`}>
+        {valor.toLocaleString("es-AR")}
       </p>
-      <p
-        className={`mt-2 font-mono text-3xl font-bold ${
-          alerta ? "text-danger glow-danger" : "text-neon glow-neon"
-        }`}
-      >
-        {valor}
-      </p>
+      {alerta && valor > 0 ? (
+        <p className="mt-1 flex items-center gap-1 text-xs text-warn">
+          <span>⚠</span> Requieren atención
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-fade">activos</p>
+      )}
+      <div className="mt-4 h-10">
+        <svg viewBox="0 0 120 40" className="h-full w-full" preserveAspectRatio="none">
+          <path d={sparkPath} fill="none" stroke={sparkColor} strokeWidth="1.5" opacity="0.6" />
+        </svg>
+      </div>
     </div>
   );
 
-  return href ? <Link href={href}>{contenido}</Link> : contenido;
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function KpiIcon({ name, color }: { name: string; color: string }) {
+  switch (name) {
+    case "box":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+          <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+        </svg>
+      );
+    case "building":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18ZM6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+          <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
+        </svg>
+      );
+    case "arrows":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" />
+        </svg>
+      );
+    case "alert":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }

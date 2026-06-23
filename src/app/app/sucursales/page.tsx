@@ -13,48 +13,56 @@ export default async function SucursalesPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-mono text-xl font-bold text-ink">Sucursales y depósitos</h1>
-        <p className="font-mono text-xs text-fade uppercase tracking-widest">
-          // cada local o depósito donde controlás stock
+      <header>
+        <h1 className="text-2xl font-bold text-ink">Sucursales y depósitos</h1>
+        <p className="mt-0.5 text-sm text-fade">
+          Cada local o depósito donde controlás stock
         </p>
       </header>
 
-      <div className="overflow-hidden border border-rail">
-        <table className="w-full font-mono text-sm">
-          <thead className="bg-panel2 text-left">
-            <tr>
-              <th className="px-4 py-3 text-[10px] font-normal uppercase tracking-widest text-fade">Nombre</th>
-              <th className="px-4 py-3 text-[10px] font-normal uppercase tracking-widest text-fade">Tipo</th>
-              <th className="px-4 py-3 text-[10px] font-normal uppercase tracking-widest text-fade">Dirección</th>
-              <th className="px-4 py-3 text-[10px] font-normal uppercase tracking-widest text-fade">Estado</th>
-              {esAdmin && <th className="px-4 py-3" />}
+      <div className="overflow-hidden rounded-xl border border-rail bg-panel">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-rail bg-panel2">
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                Nombre
+              </th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                Tipo
+              </th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                Dirección
+              </th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                Estado
+              </th>
+              {esAdmin && <th className="px-5 py-3.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
             {sucursales.map((s) => (
               <tr key={s.id} className="transition-colors hover:bg-panel2">
-                <td className="px-4 py-2.5 font-bold text-ink">{s.nombre}</td>
-                <td className="px-4 py-2.5 text-fade">
+                <td className="px-5 py-3 font-semibold text-ink">{s.nombre}</td>
+                <td className="px-5 py-3 text-fade">
                   {s.tipo === "LOCAL" ? "Local" : "Depósito"}
                 </td>
-                <td className="px-4 py-2.5 text-xs text-ghost">{s.direccion ?? "—"}</td>
-                <td className="px-4 py-2.5">
+                <td className="px-5 py-3 text-xs text-ghost">{s.direccion ?? "—"}</td>
+                <td className="px-5 py-3">
                   <span
-                    className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest ${
+                    className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
                       s.activo
-                        ? "border-neon/40 bg-neon/10 text-neon"
-                        : "border-rail bg-panel2 text-ghost"
+                        ? "bg-success/15 text-success"
+                        : "bg-ghost/15 text-ghost"
                     }`}
                   >
                     {s.activo ? "Activa" : "Inactiva"}
                   </span>
                 </td>
                 {esAdmin && (
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-5 py-3 text-right">
                     <form action={alternarSucursal}>
                       <input type="hidden" name="id" value={s.id} />
-                      <button className="font-mono text-[11px] text-fade underline underline-offset-2 hover:text-neon transition-colors">
+                      <button className="text-xs font-medium text-fade underline underline-offset-2 transition-colors hover:text-neon">
                         {s.activo ? "Desactivar" : "Activar"}
                       </button>
                     </form>
@@ -64,8 +72,8 @@ export default async function SucursalesPage() {
             ))}
             {sucursales.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-xs text-fade uppercase tracking-widest">
-                  // no hay sucursales todavía
+                <td colSpan={5} className="px-5 py-12 text-center text-sm text-fade">
+                  No hay sucursales todavía
                 </td>
               </tr>
             )}
@@ -74,20 +82,18 @@ export default async function SucursalesPage() {
       </div>
 
       {esAdmin && (
-        <section className="border border-rail bg-panel p-4 space-y-3">
-          <h2 className="font-mono text-[10px] font-bold uppercase tracking-widest text-fade">
-            Nueva sucursal
-          </h2>
-          <form action={crearSucursal} className="grid gap-2 md:grid-cols-4">
+        <div className="rounded-xl border border-rail bg-panel p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Nueva sucursal</h2>
+          <form action={crearSucursal} className="grid gap-2.5 md:grid-cols-4">
             <input
               name="nombre"
               placeholder="Nombre"
               required
-              className="border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
             />
             <select
               name="tipo"
-              className="border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
             >
               <option value="LOCAL">Local</option>
               <option value="DEPOSITO">Depósito</option>
@@ -95,13 +101,13 @@ export default async function SucursalesPage() {
             <input
               name="direccion"
               placeholder="Dirección (opcional)"
-              className="border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
             />
-            <button className="border border-neon/60 bg-neon/10 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon transition-colors hover:bg-neon/20">
+            <button className="rounded-lg bg-neon/15 px-4 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25">
               + Agregar
             </button>
           </form>
-        </section>
+        </div>
       )}
     </div>
   );

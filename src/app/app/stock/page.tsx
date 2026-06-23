@@ -20,48 +20,55 @@ export default async function StockPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-mono text-xl font-bold text-ink">Stock por sucursal</h1>
-        <p className="font-mono text-xs text-fade uppercase tracking-widest">
-          // qué hay y dónde · en rojo, por debajo del mínimo
+      <header>
+        <h1 className="text-2xl font-bold text-ink">Inventario</h1>
+        <p className="mt-0.5 text-sm text-fade">
+          Stock por sucursal · en rojo cuando está por debajo del mínimo
         </p>
       </header>
 
-      <div className="overflow-x-auto border border-rail">
-        <table className="w-full font-mono text-sm">
-          <thead className="bg-panel2 text-left">
-            <tr>
-              <th className="px-4 py-3 text-[10px] font-normal uppercase tracking-widest text-fade">
+      <div className="overflow-x-auto rounded-xl border border-rail bg-panel">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-rail bg-panel2">
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Producto
               </th>
               {sucursales.map((s) => (
-                <th key={s.id} className="px-4 py-3 text-right text-[10px] font-normal uppercase tracking-widest text-fade">
+                <th
+                  key={s.id}
+                  className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade"
+                >
                   {s.nombre}
                 </th>
               ))}
-              <th className="px-4 py-3 text-right text-[10px] font-normal uppercase tracking-widest text-fade">
+              <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
                 Total
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
             {productos.map((p) => {
-              const porSuc = new Map(p.stock.map((s) => [s.sucursalId, Number(s.cantidad)]));
+              const porSuc = new Map(
+                p.stock.map((s) => [s.sucursalId, Number(s.cantidad)]),
+              );
               const total = [...porSuc.values()].reduce((a, b) => a + b, 0);
               const minimo = Number(p.stockMinimo);
               const bajo = total <= minimo;
               return (
                 <tr key={p.id} className="transition-colors hover:bg-panel2">
-                  <td className="px-4 py-2.5 font-bold text-ink">{p.nombre}</td>
+                  <td className="px-5 py-3 font-semibold text-ink">{p.nombre}</td>
                   {sucursales.map((s) => {
                     const c = porSuc.get(s.id) ?? 0;
                     return (
-                      <td key={s.id} className="px-4 py-2.5 text-right text-fade">
+                      <td key={s.id} className="px-5 py-3 text-right text-fade">
                         {c}
                       </td>
                     );
                   })}
-                  <td className={`px-4 py-2.5 text-right font-bold ${bajo ? "text-danger glow-danger" : "text-neon"}`}>
+                  <td
+                    className={`px-5 py-3 text-right font-bold ${bajo ? "text-danger" : "text-success"}`}
+                  >
                     {total}
                   </td>
                 </tr>
@@ -71,9 +78,9 @@ export default async function StockPage() {
               <tr>
                 <td
                   colSpan={sucursales.length + 2}
-                  className="px-4 py-8 text-center text-xs text-fade uppercase tracking-widest"
+                  className="px-5 py-12 text-center text-sm text-fade"
                 >
-                  // cargá productos y movimientos para ver el stock
+                  Cargá productos y movimientos para ver el stock
                 </td>
               </tr>
             )}

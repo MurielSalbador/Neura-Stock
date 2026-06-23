@@ -2,24 +2,26 @@
 
 @theme inline {
   /* Canvas / surfaces */
-  --color-canvas:  #050d08;
-  --color-panel:   #091310;
-  --color-panel2:  #0d1a14;
+  --color-canvas:   #0d1117;
+  --color-panel:    #161b27;
+  --color-panel2:   #1c2233;
 
   /* Borders */
-  --color-rail:    #122018;
+  --color-rail:     #21262d;
 
-  /* Accent */
-  --color-neon:    #00ff88;
+  /* Accent - Purple */
+  --color-neon:     #8b5cf6;
 
   /* Text */
-  --color-ink:     #c4edd8;
-  --color-fade:    #3a6a4a;
-  --color-ghost:   #172a1e;
+  --color-ink:      #e6edf3;
+  --color-fade:     #8b949e;
+  --color-ghost:    #484f58;
 
-  /* States */
-  --color-danger:  #ff2d55;
-  --color-warn:    #ffb300;
+  /* Status */
+  --color-danger:   #f85149;
+  --color-warn:     #e3b341;
+  --color-success:  #3fb950;
+  --color-info:     #58a6ff;
 
   /* Font tokens */
   --font-sans: var(--font-geist-sans);
@@ -28,50 +30,46 @@
 
 /* ── Base ── */
 body {
-  background-color: #050d08;
-  background-image:
-    linear-gradient(rgba(0, 255, 136, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 136, 0.022) 1px, transparent 1px);
-  background-size: 64px 64px;
-  color: #c4edd8;
-  font-family: var(--font-geist-mono, monospace);
+  background-color: #0d1117;
+  color: #e6edf3;
+  font-family: var(--font-geist-sans, system-ui, -apple-system, sans-serif);
 }
 
 /* ── Form controls ── */
 input,
 select,
 textarea {
-  background-color: #091310;
-  color: #c4edd8;
+  background-color: #161b27;
+  color: #e6edf3;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #1e3828;
+  color: #484f58;
 }
 
 select option {
-  background-color: #0d1a14;
-  color: #c4edd8;
+  background-color: #1c2233;
+  color: #e6edf3;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #00ff88 !important;
-  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.35), 0 0 12px rgba(0, 255, 136, 0.12);
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 }
 
 /* ── Utilities ── */
 .glow-neon {
-  text-shadow: 0 0 18px rgba(0, 255, 136, 0.55);
+  text-shadow: 0 0 18px rgba(139, 92, 246, 0.55);
 }
 
 .glow-danger {
-  text-shadow: 0 0 14px rgba(255, 45, 85, 0.5);
+  text-shadow: 0 0 14px rgba(248, 81, 73, 0.5);
 }
 
 .brand-glow {
-  text-shadow: 0 0 24px rgba(0, 255, 136, 0.6), 0 0 48px rgba(0, 255, 136, 0.2);
+  text-shadow: 0 0 24px rgba(139, 92, 246, 0.6), 0 0 48px rgba(139, 92, 246, 0.2);
 }

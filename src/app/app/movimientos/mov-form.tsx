@@ -24,15 +24,15 @@ export function MovForm({
   if (state.ok) formRef.current?.reset();
 
   return (
-    <form ref={formRef} action={action} className="grid gap-3 md:grid-cols-2">
+    <form ref={formRef} action={action} className="grid gap-4 md:grid-cols-2">
       {state.error && (
-        <p className="md:col-span-2 border border-danger/40 bg-danger/10 px-3 py-2 font-mono text-xs text-danger">
+        <p className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger md:col-span-2">
           {state.error}
         </p>
       )}
       {state.ok && (
-        <p className="md:col-span-2 border border-neon/40 bg-neon/10 px-3 py-2 font-mono text-xs text-neon">
-          // Movimiento registrado. Stock actualizado.
+        <p className="rounded-lg border border-success/40 bg-success/10 px-4 py-2.5 text-sm text-success md:col-span-2">
+          Movimiento registrado. Stock actualizado.
         </p>
       )}
 
@@ -41,7 +41,7 @@ export function MovForm({
           name="tipo"
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
         >
           <option value="ENTRADA">Entrada (compra / ingreso)</option>
           <option value="SALIDA">Salida (venta / egreso)</option>
@@ -54,7 +54,7 @@ export function MovForm({
         <select
           name="productoId"
           required
-          className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
         >
           <option value="">Elegí un producto…</option>
           {productos.map((p) => (
@@ -70,11 +70,13 @@ export function MovForm({
           <select
             name="sucursalOrigenId"
             required
-            className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
           >
             <option value="">Elegí…</option>
             {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
             ))}
           </select>
         </Campo>
@@ -85,11 +87,13 @@ export function MovForm({
           <select
             name="sucursalDestinoId"
             required
-            className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
           >
             <option value="">Elegí…</option>
             {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
             ))}
           </select>
         </Campo>
@@ -102,23 +106,24 @@ export function MovForm({
           step="0.001"
           required
           placeholder={tipo === "AJUSTE" ? "Ej: -2" : "Ej: 10"}
-          className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
         />
       </Campo>
 
       <Campo label="Motivo (opcional)">
         <input
           name="motivo"
-          className="w-full border border-rail bg-panel px-3 py-2 font-mono text-sm text-ink transition-colors"
+          placeholder="Notas..."
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
         />
       </Campo>
 
       <div className="md:col-span-2">
         <button
           disabled={pending}
-          className="border border-neon/60 bg-neon/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-widest text-neon transition-colors hover:bg-neon/20 disabled:opacity-40"
+          className="rounded-lg bg-neon/15 px-5 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25 disabled:opacity-40"
         >
-          {pending ? "// registrando…" : "Registrar movimiento →"}
+          {pending ? "Registrando…" : "Registrar movimiento →"}
         </button>
       </div>
     </form>
@@ -127,8 +132,8 @@ export function MovForm({
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="font-mono text-[11px] uppercase tracking-widest text-fade">{label}</span>
+    <label className="block space-y-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-fade">{label}</span>
       {children}
     </label>
   );
