@@ -1,0 +1,337 @@
+// Stock-Neura — esquema de datos
+// Multi-tenant por `empresaId`. El stock se deriva de los movimientos:
+// `Stock` es un cache; `Movimiento` es la fuente de verdad.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Tenant / organización
+// ============================================================
+
+model Empresa {
+  id        String   @id @default(cuid())
+  nombre    String
+  cuit      String?
+  plan      String   @default("trial") // trial | basico | pro
+  estado    String   @default("activo") // activo | suspendido
+  // Flags de features que cambian según rubro
+  usaLotes  Boolean  @default(false) // lotes/vencimientos (farmacias)
+  creadaEn  DateTime @default(now())
+
+  usuarios     Usuario[]
+  sucursales   Sucursal[]
+  categorias   Categoria[]
+  productos    Producto[]
+  stock        Stock[]
+  movimientos  Movimiento[]
+  proveedores  Proveedor[]
+  clientes     Cliente[]
+  compras      Compra[]
+  ventas       Venta[]
+
+  @@index([estado])
+}
+
+// ============================================================
+// Usuarios y auth (Auth.js / NextAuth)
+// ============================================================
+
+enum Rol {
+  ADMIN // dueño: ve todo
+  ENCARGADO // encargado de una sucursal
+  VENDEDOR // solo ventas y consulta
+}
+
+model Usuario {
+  id            String    @id @default(cuid())
+  empresaId     String
+  empresa       Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre        String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  rol           Rol       @default(VENDEDOR)
+  sucursalId    String? // sucursal asignada (encargado/vendedor)
+  sucursal      Sucursal? @relation(fields: [sucursalId], references: [id], onDelete: SetNull)
+  activo        Boolean   @default(true)
+  creadoEn      DateTime  @default(now())
+
+  accounts    Account[]
+  sessions    Session[]
+  movimientos Movimiento[]
+  ventas      Venta[]
+
+  @@index([empresaId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// Sucursales / depósitos
+// ============================================================
+
+enum TipoSucursal {
+  LOCAL
+  DEPOSITO
+}
+
+model Sucursal {
+  id        String       @id @default(cuid())
+  empresaId String
+  empresa   Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  tipo      TipoSucursal @default(LOCAL)
+  direccion String?
+  activo    Boolean      @default(true)
+  creadoEn  DateTime     @default(now())
+
+  usuarios           Usuario[]
+  stock              Stock[]
+  movimientosOrigen  Movimiento[] @relation("MovOrigen")
+  movimientosDestino Movimiento[] @relation("MovDestino")
+  compras            Compra[]
+  ventas             Venta[]
+
+  @@index([empresaId])
+}
+
+// ============================================================
+// Catálogo
+// ============================================================
+
+model Categoria {
+  id        String      @id @default(cuid())
+  empresaId String
+  empresa   Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  padreId   String?
+  padre     Categoria?  @relation("CategoriaPadre", fields: [padreId], references: [id], onDelete: SetNull)
+  hijos     Categoria[] @relation("CategoriaPadre")
+  productos Producto[]
+
+  @@index([empresaId])
+}
+
+model Producto {
+  id           String     @id @default(cuid())
+  empresaId    String
+  empresa      Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  sku          String
+  codigoBarras String?
+  nombre       String
+  categoriaId  String?
+  categoria    Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  unidad       String     @default("unidad")
+  precioCosto  Decimal    @default(0) @db.Decimal(14, 2)
+  precioVenta  Decimal    @default(0) @db.Decimal(14, 2)
+  iva          Decimal    @default(21) @db.Decimal(5, 2)
+  stockMinimo  Decimal    @default(0) @db.Decimal(14, 3)
+  fotoUrl      String?
+  activo       Boolean    @default(true)
+  creadoEn     DateTime   @default(now())
+
+  stock       Stock[]
+  movimientos Movimiento[]
+  compraItems CompraItem[]
+  ventaItems  VentaItem[]
+
+  @@unique([empresaId, sku])
+  @@index([empresaId])
+  @@index([empresaId, codigoBarras])
+}
+
+// Cache de stock por producto y sucursal (derivado de Movimiento)
+model Stock {
+  id         String   @id @default(cuid())
+  empresaId  String
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  cantidad   Decimal  @default(0) @db.Decimal(14, 3)
+
+  @@unique([productoId, sucursalId])
+  @@index([empresaId])
+  @@index([sucursalId])
+}
+
+// ============================================================
+// Movimientos (fuente de verdad del stock)
+// ============================================================
+
+enum TipoMovimiento {
+  ENTRADA // compra / ingreso
+  SALIDA // venta / egreso
+  TRANSFERENCIA // entre sucursales
+  AJUSTE // conteo / merma / rotura
+}
+
+model Movimiento {
+  id                String         @id @default(cuid())
+  empresaId         String
+  empresa           Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productoId        String
+  producto          Producto       @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  tipo              TipoMovimiento
+  cantidad          Decimal        @db.Decimal(14, 3) // positiva; el signo lo da el tipo
+  sucursalOrigenId  String?
+  sucursalOrigen    Sucursal?      @relation("MovOrigen", fields: [sucursalOrigenId], references: [id], onDelete: SetNull)
+  sucursalDestinoId String?
+  sucursalDestino   Sucursal?      @relation("MovDestino", fields: [sucursalDestinoId], references: [id], onDelete: SetNull)
+  costoUnitario     Decimal?       @db.Decimal(14, 2)
+  motivo            String?
+  usuarioId         String?
+  usuario           Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  refTipo           String? // venta | compra | null
+  refId             String?
+  creadoEn          DateTime       @default(now())
+
+  @@index([empresaId])
+  @@index([productoId])
+  @@index([empresaId, creadoEn])
+}
+
+// ============================================================
+// Proveedores / clientes
+// ============================================================
+
+model Proveedor {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  cuit      String?
+  contacto  String?
+  creadoEn  DateTime @default(now())
+
+  compras Compra[]
+
+  @@index([empresaId])
+}
+
+model Cliente {
+  id              String   @id @default(cuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre          String
+  cuitDni         String?
+  contacto        String?
+  cuentaCorriente Decimal  @default(0) @db.Decimal(14, 2)
+  creadoEn        DateTime @default(now())
+
+  ventas Venta[]
+
+  @@index([empresaId])
+}
+
+// ============================================================
+// Compras / ventas
+// ============================================================
+
+model Compra {
+  id          String     @id @default(cuid())
+  empresaId   String
+  empresa     Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  proveedorId String?
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  sucursalId  String
+  sucursal    Sucursal   @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  fecha       DateTime   @default(now())
+  total       Decimal    @default(0) @db.Decimal(14, 2)
+  estado      String     @default("recibida") // borrador | recibida
+
+  items CompraItem[]
+
+  @@index([empresaId])
+}
+
+model CompraItem {
+  id            String   @id @default(cuid())
+  compraId      String
+  compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId    String
+  producto      Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  cantidad      Decimal  @db.Decimal(14, 3)
+  costoUnitario Decimal  @db.Decimal(14, 2)
+
+  @@index([compraId])
+}
+
+model Venta {
+  id              String   @id @default(cuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clienteId       String?
+  cliente         Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  sucursalId      String
+  sucursal        Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  usuarioId       String?
+  usuario         Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  fecha           DateTime @default(now())
+  total           Decimal  @default(0) @db.Decimal(14, 2)
+  medioPago       String   @default("efectivo")
+  estado          String   @default("completada")
+  comprobanteTipo String? // A | B | C | null
+  comprobanteNro  String?
+
+  items VentaItem[]
+
+  @@index([empresaId])
+  @@index([empresaId, fecha])
+}
+
+model VentaItem {
+  id             String   @id @default(cuid())
+  ventaId        String
+  venta          Venta    @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  cantidad       Decimal  @db.Decimal(14, 3)
+  precioUnitario Decimal  @db.Decimal(14, 2)
+  iva            Decimal  @default(21) @db.Decimal(5, 2)
+
+  @@index([ventaId])
+}
