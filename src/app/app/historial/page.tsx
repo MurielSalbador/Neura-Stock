@@ -29,21 +29,30 @@ export default async function HistorialPage() {
 
   const empresaId = user.empresaId;
 
-  const movimientos = await prisma.movimiento.findMany({
-    where: { empresaId },
-    orderBy: { creadoEn: "desc" },
-    take: 200,
-    include: {
-      producto:        { select: { nombre: true } },
-      sucursalOrigen:  { select: { nombre: true } },
-      sucursalDestino: { select: { nombre: true } },
-      usuario:         { select: { nombre: true, rol: true } },
-    },
-  });
+  const [movimientos, conteoPorTipo] = await Promise.all([
+    prisma.movimiento.findMany({
+      where: { empresaId },
+      orderBy: { creadoEn: "desc" },
+      take: 200,
+      include: {
+        producto:        { select: { nombre: true } },
+        sucursalOrigen:  { select: { nombre: true } },
+        sucursalDestino: { select: { nombre: true } },
+        usuario:         { select: { nombre: true, rol: true } },
+      },
+    }),
+    prisma.movimiento.groupBy({
+      by: ["tipo"],
+      where: { empresaId },
+      _count: { tipo: true },
+    }),
+  ]);
+
+  const totalMovimientos = conteoPorTipo.reduce((acc, c) => acc + c._count.tipo, 0);
 
   const statsPorTipo = ["ENTRADA", "SALIDA", "TRANSFERENCIA", "AJUSTE"].map((tipo) => ({
     tipo,
-    count: movimientos.filter((m) => m.tipo === tipo).length,
+    count: conteoPorTipo.find((c) => c.tipo === tipo)?._count.tipo ?? 0,
   }));
 
   return (
@@ -57,7 +66,7 @@ export default async function HistorialPage() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-rail bg-panel p-4">
           <p className="text-xs text-fade">Total registros</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{movimientos.length}</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{totalMovimientos}</p>
         </div>
         {statsPorTipo.map(({ tipo, count }) => {
           const colorClass = TIPO_COLOR[tipo]?.split(" ")[1] ?? "text-ink";

@@ -41,21 +41,29 @@ export default async function UsuarioHistorialPage({
   // ENCARGADO cannot view ADMINs
   if (admin.rol === "ENCARGADO" && target.rol === "ADMIN") notFound();
 
-  const movimientos = await prisma.movimiento.findMany({
-    where: { empresaId: admin.empresaId, usuarioId },
-    orderBy: { creadoEn: "desc" },
-    take: 50,
-    include: {
-      producto:        { select: { nombre: true } },
-      sucursalOrigen:  { select: { nombre: true } },
-      sucursalDestino: { select: { nombre: true } },
-    },
-  });
+  const [movimientos, conteoPorTipo] = await Promise.all([
+    prisma.movimiento.findMany({
+      where: { empresaId: admin.empresaId, usuarioId },
+      orderBy: { creadoEn: "desc" },
+      take: 50,
+      include: {
+        producto:        { select: { nombre: true } },
+        sucursalOrigen:  { select: { nombre: true } },
+        sucursalDestino: { select: { nombre: true } },
+      },
+    }),
+    prisma.movimiento.groupBy({
+      by: ["tipo"],
+      where: { empresaId: admin.empresaId, usuarioId },
+      _count: { tipo: true },
+    }),
+  ]);
 
-  // Stats per type
+  const totalMovimientos = conteoPorTipo.reduce((acc, c) => acc + c._count.tipo, 0);
+
   const statsPorTipo = ["ENTRADA", "SALIDA", "TRANSFERENCIA", "AJUSTE"].map((tipo) => ({
     tipo,
-    count: movimientos.filter((m) => m.tipo === tipo).length,
+    count: conteoPorTipo.find((c) => c.tipo === tipo)?._count.tipo ?? 0,
   }));
 
   const inicial = (target.nombre ?? target.email).charAt(0).toUpperCase();
@@ -104,7 +112,7 @@ export default async function UsuarioHistorialPage({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-rail bg-panel p-4">
           <p className="text-xs text-fade">Total movimientos</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{movimientos.length}</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{totalMovimientos}</p>
         </div>
         {statsPorTipo.map(({ tipo, count }) => (
           <div key={tipo} className="rounded-xl border border-rail bg-panel p-4">

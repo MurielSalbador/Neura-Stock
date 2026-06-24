@@ -81,6 +81,19 @@ export async function nuevoMovimiento(
   });
   if (!prod) return { error: "Producto inválido" };
 
+  if (d.sucursalOrigenId) {
+    const suc = await prisma.sucursal.findFirst({
+      where: { id: d.sucursalOrigenId, empresaId: user.empresaId },
+    });
+    if (!suc) return { error: "Sucursal de origen inválida" };
+  }
+  if (d.sucursalDestinoId) {
+    const suc = await prisma.sucursal.findFirst({
+      where: { id: d.sucursalDestinoId, empresaId: user.empresaId },
+    });
+    if (!suc) return { error: "Sucursal de destino inválida" };
+  }
+
   try {
     await registrarMovimiento({
       empresaId: user.empresaId,

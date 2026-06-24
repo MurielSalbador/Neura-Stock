@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { crearSucursal, alternarSucursal } from "./actions";
+import { alternarSucursal } from "./actions";
+import { SucursalForm } from "./sucursal-form";
 
 export default async function SucursalesPage() {
   const user = await requireUser();
@@ -84,29 +85,7 @@ export default async function SucursalesPage() {
       {esAdmin && (
         <div className="rounded-xl border border-rail bg-panel p-5">
           <h2 className="mb-4 text-sm font-semibold text-ink">Nueva sucursal</h2>
-          <form action={crearSucursal} className="grid gap-2.5 md:grid-cols-4">
-            <input
-              name="nombre"
-              placeholder="Nombre"
-              required
-              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-            />
-            <select
-              name="tipo"
-              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
-            >
-              <option value="LOCAL">Local</option>
-              <option value="DEPOSITO">Depósito</option>
-            </select>
-            <input
-              name="direccion"
-              placeholder="Dirección (opcional)"
-              className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-            />
-            <button className="rounded-lg bg-neon/15 px-4 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25">
-              + Agregar
-            </button>
-          </form>
+          <SucursalForm />
         </div>
       )}
     </div>

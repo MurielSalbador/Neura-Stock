@@ -97,6 +97,7 @@ export default async function DashboardPage({
     prisma.stock.findMany({
       where: { empresaId },
       include: { producto: { select: { nombre: true, stockMinimo: true } } },
+      take: 500,
     }),
     prisma.movimiento.findMany({
       where: movRecientesWhere,
@@ -163,10 +164,8 @@ export default async function DashboardPage({
   const movsSparkData      = groupByDay(movsLast7);
   const productosSparkData = groupByDay(productosLast7);
   const sucursalesFlat     = new Array(7).fill(sucursalesList.length);
-  const alertasData =
-    bajosGeneral.length === 0
-      ? [1, 2, 3, 3, 4, 4, 5]
-      : [5, 4, 4, 3, 3, 2, Math.max(1, 5 - bajosGeneral.length)];
+  // Línea plana con el valor actual — no tenemos historial de alertas todavía.
+  const alertasData = new Array(7).fill(bajosGeneral.length);
 
   const movsEstaSemanana      = movsLast7.length;
   const productosEstaSemanana = productosLast7.length;

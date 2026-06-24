@@ -12,15 +12,6 @@ type RegistrarMov = {
   usuarioId?: string | null;
 };
 
-/**
- * Registra un movimiento y actualiza el cache de stock en una transacción.
- * El stock real siempre se deriva de los movimientos.
- *
- * - ENTRADA: suma en destino
- * - SALIDA: resta en origen
- * - TRANSFERENCIA: resta en origen, suma en destino
- * - AJUSTE: aplica el delta (puede ser negativo) en origen
- */
 export async function registrarMovimiento(m: RegistrarMov) {
   if (m.cantidad === 0) throw new Error("La cantidad no puede ser 0");
 
@@ -38,6 +29,18 @@ export async function registrarMovimiento(m: RegistrarMov) {
       });
     };
 
+    // Verifica que haya stock suficiente antes de descontar.
+    const verificarSuficiente = async (sucursalId: string, necesario: number) => {
+      const row = await tx.stock.findUnique({
+        where: { productoId_sucursalId: { productoId: m.productoId, sucursalId } },
+        select: { cantidad: true },
+      });
+      const actual = Number(row?.cantidad ?? 0);
+      if (actual < necesario) {
+        throw new Error(`Stock insuficiente: disponible ${actual}, requerido ${necesario}`);
+      }
+    };
+
     const cant = Math.abs(m.cantidad);
 
     switch (m.tipo) {
@@ -47,6 +50,7 @@ export async function registrarMovimiento(m: RegistrarMov) {
         break;
       case "SALIDA":
         if (!m.sucursalOrigenId) throw new Error("Falta sucursal origen");
+        await verificarSuficiente(m.sucursalOrigenId, cant);
         await sumar(m.sucursalOrigenId, -cant);
         break;
       case "TRANSFERENCIA":
@@ -54,12 +58,14 @@ export async function registrarMovimiento(m: RegistrarMov) {
           throw new Error("Faltan sucursales");
         if (m.sucursalOrigenId === m.sucursalDestinoId)
           throw new Error("Origen y destino no pueden ser iguales");
+        await verificarSuficiente(m.sucursalOrigenId, cant);
         await sumar(m.sucursalOrigenId, -cant);
         await sumar(m.sucursalDestinoId, cant);
         break;
       case "AJUSTE":
         if (!m.sucursalOrigenId) throw new Error("Falta sucursal");
-        await sumar(m.sucursalOrigenId, m.cantidad); // respeta el signo
+        if (m.cantidad < 0) await verificarSuficiente(m.sucursalOrigenId, cant);
+        await sumar(m.sucursalOrigenId, m.cantidad);
         break;
     }
 
@@ -68,7 +74,9 @@ export async function registrarMovimiento(m: RegistrarMov) {
         empresaId: m.empresaId,
         productoId: m.productoId,
         tipo: m.tipo,
-        cantidad: cant,
+        // AJUSTE guarda el delta CON signo para que la reversión sea siempre -cantidad.
+        // El resto de tipos guardan el valor absoluto (el signo queda implícito en el tipo).
+        cantidad: m.tipo === "AJUSTE" ? m.cantidad : cant,
         sucursalOrigenId: m.sucursalOrigenId ?? null,
         sucursalDestinoId: m.sucursalDestinoId ?? null,
         motivo: m.motivo ?? null,

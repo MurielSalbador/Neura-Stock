@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { nuevoMovimiento, type MovState } from "./actions";
 
 type Opt = { id: string; nombre: string };
@@ -21,7 +21,9 @@ export function MovForm({
   const usaOrigen  = tipo !== "ENTRADA";
   const usaDestino = tipo === "ENTRADA" || tipo === "TRANSFERENCIA";
 
-  if (state.ok) formRef.current?.reset();
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state.ok]);
 
   return (
     <form ref={formRef} action={action} className="grid gap-4 md:grid-cols-2">

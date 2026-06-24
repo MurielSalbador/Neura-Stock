@@ -11,19 +11,32 @@ const schema = z.object({
   direccion: z.string().optional(),
 });
 
-export async function crearSucursal(formData: FormData) {
+export type SucursalState = { error?: string; ok?: boolean };
+
+export async function crearSucursal(
+  _prev: SucursalState,
+  formData: FormData,
+): Promise<SucursalState> {
   const user = await requireAdmin();
   const parsed = schema.safeParse({
     nombre: formData.get("nombre"),
     tipo: formData.get("tipo"),
     direccion: formData.get("direccion") || undefined,
   });
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
 
-  await prisma.sucursal.create({
-    data: { ...parsed.data, empresaId: user.empresaId },
-  });
+  try {
+    await prisma.sucursal.create({
+      data: { ...parsed.data, empresaId: user.empresaId },
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo crear la sucursal" };
+  }
+
   revalidatePath("/app/sucursales");
+  return { ok: true };
 }
 
 export async function alternarSucursal(formData: FormData) {

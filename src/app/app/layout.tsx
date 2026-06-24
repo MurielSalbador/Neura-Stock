@@ -116,8 +116,12 @@ export default async function PanelLayout({
               type="text"
               placeholder="Buscar productos, movimientos..."
               readOnly
-              className="w-full cursor-default rounded-lg border border-rail bg-panel2 py-2 pl-10 pr-4 text-sm transition-colors"
+              title="Búsqueda global — próximamente"
+              className="w-full cursor-not-allowed rounded-lg border border-rail bg-panel2 py-2 pl-10 pr-28 text-sm opacity-50 transition-colors"
             />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-rail px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ghost">
+              Próximamente
+            </span>
           </div>
 
           <div className="ml-auto flex items-center gap-3">

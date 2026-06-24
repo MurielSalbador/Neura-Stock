@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { crearProducto, eliminarProducto } from "./actions";
+import { eliminarProducto } from "./actions";
+import { ProductoForm } from "./producto-form";
 import { ConfirmButton } from "../confirm-button";
 
 export default async function ProductosPage() {
@@ -30,59 +31,7 @@ export default async function ProductosPage() {
       {/* Nuevo producto */}
       <div className="rounded-xl border border-rail bg-panel p-5">
         <h2 className="mb-4 text-sm font-semibold text-ink">Nuevo producto</h2>
-        <form action={crearProducto} className="grid gap-2.5 md:grid-cols-5">
-          <input
-            name="sku"
-            placeholder="SKU / código"
-            required
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-          />
-          <input
-            name="nombre"
-            placeholder="Nombre"
-            required
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors md:col-span-2"
-          />
-          <input
-            name="codigoBarras"
-            placeholder="Cód. barras (opc.)"
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-          />
-          <input
-            name="precioVenta"
-            type="number"
-            step="0.01"
-            placeholder="Precio venta"
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-          />
-          <input
-            name="stockMinimo"
-            type="number"
-            step="0.001"
-            placeholder="Stock mínimo"
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-          />
-          <input
-            name="stockInicial"
-            type="number"
-            step="0.001"
-            min="0"
-            placeholder="Stock actual"
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
-          />
-          <select
-            name="sucursalId"
-            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors md:col-span-2"
-          >
-            <option value="">Sucursal (si cargás stock)</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-          <button className="rounded-lg bg-neon/15 px-4 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25 md:col-span-2">
-            + Agregar producto
-          </button>
-        </form>
+        <ProductoForm sucursales={sucursales} />
       </div>
 
       {/* Tabla */}

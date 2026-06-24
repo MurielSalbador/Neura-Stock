@@ -41,7 +41,12 @@ export async function eliminarProducto(formData: FormData): Promise<void> {
   revalidatePath("/app");
 }
 
-export async function crearProducto(formData: FormData) {
+export type ProductoState = { error?: string; ok?: boolean };
+
+export async function crearProducto(
+  _prev: ProductoState,
+  formData: FormData,
+): Promise<ProductoState> {
   const user = await requireUser();
   const parsed = schema.safeParse({
     sku: formData.get("sku"),
@@ -49,10 +54,12 @@ export async function crearProducto(formData: FormData) {
     codigoBarras: formData.get("codigoBarras") || undefined,
     precioVenta: formData.get("precioVenta") || 0,
     stockMinimo: formData.get("stockMinimo") || 0,
-    stockInicial: formData.get("stockInicial") || 0,
+    stockInicial: formData.get("stockInicial") || undefined,
     sucursalId: formData.get("sucursalId") || undefined,
   });
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
 
   const { stockInicial, sucursalId, ...productoData } = parsed.data;
 
@@ -72,10 +79,11 @@ export async function crearProducto(formData: FormData) {
         usuarioId: user.id,
       });
     }
-  } catch {
-    return;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo crear el producto" };
   }
 
   revalidatePath("/app/productos");
   revalidatePath("/app/stock");
+  return { ok: true };
 }

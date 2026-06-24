@@ -43,17 +43,11 @@ export default async function AdminPage({
       include: { sucursal: { select: { nombre: true, id: true } } },
       orderBy: [{ rol: "asc" }, { creadoEn: "asc" }],
     }),
-    esAdmin
-      ? prisma.sucursal.findMany({
-          where: { empresaId: user.empresaId, activo: true },
-          select: { id: true, nombre: true },
-          orderBy: { nombre: "asc" },
-        })
-      : prisma.sucursal.findMany({
-          where: { empresaId: user.empresaId, activo: true },
-          select: { id: true, nombre: true },
-          orderBy: { nombre: "asc" },
-        }),
+    prisma.sucursal.findMany({
+      where: { empresaId: user.empresaId, activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
   ]);
 
   // Apply branch filter to users list; ENCARGADO never sees ADMINs
