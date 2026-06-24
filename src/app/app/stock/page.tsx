@@ -14,33 +14,72 @@ export default async function StockPage({
   const { sucursal: sucursalFiltro } = await searchParams;
   const empresaId = user.empresaId;
 
-  // VENDEDOR y ENCARGADO solo ven su sucursal por defecto.
-  const sucursalEfectiva =
-    (user.rol === "VENDEDOR" || user.rol === "ENCARGADO") && !sucursalFiltro
-      ? (user.sucursalId ?? undefined)
-      : sucursalFiltro;
+  // Sucursales que puede ver según su rol
+  const misIds = user.sucursalesIds;
+
+  // ADMIN: todas, filtro opcional por URL.
+  // ENCARGADO: sus sucursales, filtro por URL dentro de sus sucursales.
+  // VENDEDOR single-branch: solo su sucursal (fija).
+  // VENDEDOR multi-branch: sus sucursales, filtro por URL.
+  let sucursalEfectiva: string | undefined;
+  if (user.rol === "VENDEDOR") {
+    if (misIds.length > 1) {
+      sucursalEfectiva = sucursalFiltro && misIds.includes(sucursalFiltro)
+        ? sucursalFiltro
+        : misIds[0];
+    } else {
+      sucursalEfectiva = user.sucursalId ?? undefined;
+    }
+  } else if (user.rol === "ENCARGADO") {
+    sucursalEfectiva = sucursalFiltro && misIds.includes(sucursalFiltro)
+      ? sucursalFiltro
+      : (misIds.length === 1 ? misIds[0] : sucursalFiltro);
+  } else {
+    sucursalEfectiva = sucursalFiltro;
+  }
 
   const [todasSucursales, productos] = await Promise.all([
     prisma.sucursal.findMany({
-      where: { empresaId, activo: true },
+      where: {
+        empresaId,
+        activo: true,
+        ...((user.rol === "ENCARGADO" || (user.rol === "VENDEDOR" && misIds.length > 0))
+          ? { id: { in: misIds } }
+          : {}),
+      },
       orderBy: { creadoEn: "asc" },
       select: { id: true, nombre: true },
     }),
     prisma.producto.findMany({
       where: { empresaId, activo: true },
       orderBy: { nombre: "asc" },
-      include: { stock: { select: { sucursalId: true, cantidad: true } } },
+      include: {
+        stock: {
+          where: sucursalEfectiva ? { sucursalId: sucursalEfectiva } : undefined,
+          select: { sucursalId: true, cantidad: true },
+        },
+      },
     }),
   ]);
 
-  // Show only selected branch or all
+  // Columnas de sucursales a mostrar
   const sucursales = sucursalEfectiva
     ? todasSucursales.filter((s) => s.id === sucursalEfectiva)
     : todasSucursales;
 
+  // Cuando hay filtro de sucursal: mostrar solo productos que tienen stock ahí
+  const productosMostrados = sucursalEfectiva
+    ? productos.filter((p) => p.stock.some((s) => Number(s.cantidad) > 0))
+    : productos;
+
   const sucursalNombre = sucursalEfectiva
     ? todasSucursales.find((s) => s.id === sucursalEfectiva)?.nombre
     : null;
+
+  // El selector lo ven: ADMIN, ENCARGADO con múltiples sucursales, VENDEDOR con múltiples sucursales
+  const puedeFiltraSucursal =
+    esAdmin ||
+    ((user.rol === "ENCARGADO" || user.rol === "VENDEDOR") && todasSucursales.length > 1);
 
   return (
     <div className="space-y-6">
@@ -51,8 +90,8 @@ export default async function StockPage({
         </p>
       </header>
 
-      {/* Branch filter — solo ADMIN puede cambiar de sucursal */}
-      {todasSucursales.length > 1 && user.rol === "ADMIN" && (
+      {/* Branch filter */}
+      {puedeFiltraSucursal && todasSucursales.length > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
           <p className="text-xs font-medium text-fade">
             {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}
@@ -76,7 +115,7 @@ export default async function StockPage({
                   {s.nombre}
                 </th>
               ))}
-              {!sucursalEfectiva && (
+              {!sucursalEfectiva && sucursales.length > 1 && (
                 <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
                   Total
                 </th>
@@ -85,7 +124,7 @@ export default async function StockPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
-            {productos.map((p) => {
+            {productosMostrados.map((p) => {
               const porSuc = new Map(
                 p.stock.map((s) => [s.sucursalId, Number(s.cantidad)]),
               );
@@ -105,7 +144,7 @@ export default async function StockPage({
                       </td>
                     );
                   })}
-                  {!sucursalEfectiva && (
+                  {!sucursalEfectiva && sucursales.length > 1 && (
                     <td className={`px-5 py-3 text-right font-bold ${bajo ? "text-danger" : "text-success"}`}>
                       {total}
                     </td>
@@ -131,13 +170,15 @@ export default async function StockPage({
                 </tr>
               );
             })}
-            {productos.length === 0 && (
+            {productosMostrados.length === 0 && (
               <tr>
                 <td
-                  colSpan={sucursales.length + (sucursalEfectiva ? 1 : 2)}
+                  colSpan={sucursales.length + ((!sucursalEfectiva && sucursales.length > 1) ? 1 : 0) + (esAdmin ? 1 : 0) + 1}
                   className="px-5 py-12 text-center text-sm text-fade"
                 >
-                  Cargá productos y movimientos para ver el stock
+                  {sucursalNombre
+                    ? `No hay productos con stock en ${sucursalNombre}`
+                    : "Cargá productos y movimientos para ver el stock"}
                 </td>
               </tr>
             )}

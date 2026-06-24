@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -11,17 +12,133 @@ const PLAN_LABEL: Record<string, string> = {
   pro:    "Plan Pro",
 };
 
+// Fetches empresa plan — wrapped in Suspense so it doesn't block the layout
+async function PlanBadge({
+  empresaId,
+  displayName,
+}: {
+  empresaId: string;
+  displayName: string;
+}) {
+  const empresa = await prisma.empresa.findUnique({
+    where: { id: empresaId },
+    select: { plan: true },
+  });
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neon/20">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+        </svg>
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-semibold text-ink">
+          {PLAN_LABEL[empresa?.plan ?? "trial"] ?? "Plan Trial"}
+        </p>
+        <p className="truncate text-[10px] text-fade">{displayName}</p>
+      </div>
+    </div>
+  );
+}
+
+type UserInfo = {
+  id: string;
+  empresaId: string;
+  rol: string;
+  sucursalesIds: string[];
+  sucursalId: string | null;
+  name?: string | null;
+  email?: string | null;
+};
+
+// Fetches employees + sucursales for the dropdown — wrapped in Suspense
+async function AsyncUserMenu({
+  user,
+  inicial,
+}: {
+  user: UserInfo;
+  inicial: string;
+}) {
+  const [empleados, sucursales] = await Promise.all([
+    (user.rol === "ADMIN" || user.rol === "ENCARGADO")
+      ? prisma.usuario.findMany({
+          where: {
+            empresaId: user.empresaId,
+            activo: true,
+            id: { not: user.id },
+            ...(user.rol === "ENCARGADO"
+              ? {
+                  rol: "VENDEDOR",
+                  ...(user.sucursalesIds.length > 0
+                    ? { sucursalId: { in: user.sucursalesIds } }
+                    : {}),
+                }
+              : { rol: { not: "ADMIN" } }),
+          },
+          select: { id: true, nombre: true, rol: true, sucursal: { select: { id: true, nombre: true } } },
+          orderBy: [{ rol: "asc" }, { nombre: "asc" }],
+        })
+      : Promise.resolve([]),
+    (user.rol === "ADMIN" || user.rol === "ENCARGADO")
+      ? prisma.sucursal.findMany({
+          where: {
+            empresaId: user.empresaId,
+            activo: true,
+            ...(user.rol === "ENCARGADO" && user.sucursalesIds.length > 0
+              ? { id: { in: user.sucursalesIds } }
+              : {}),
+          },
+          select: { id: true, nombre: true },
+          orderBy: { nombre: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return (
+    <UserMenu
+      inicial={inicial}
+      nombre={user.name ?? "Usuario"}
+      rol={user.rol?.toLowerCase() ?? "operador"}
+      empleados={empleados.map((e) => ({
+        id: e.id,
+        nombre: e.nombre ?? e.id,
+        rol: e.rol,
+        sucursalId: e.sucursal?.id ?? null,
+        sucursalNombre: e.sucursal?.nombre ?? null,
+      }))}
+      sucursales={sucursales}
+    />
+  );
+}
+
+// Simple avatar shown while employee list loads (still functional — has sign-out)
+function UserMenuFallback({
+  inicial,
+  nombre,
+  rol,
+}: {
+  inicial: string;
+  nombre: string;
+  rol: string;
+}) {
+  return (
+    <UserMenu
+      inicial={inicial}
+      nombre={nombre}
+      rol={rol}
+      empleados={[]}
+      sucursales={[]}
+    />
+  );
+}
+
 export default async function PanelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Only one DB query blocks the layout — everything else streams in via Suspense
   const user = await requireUser();
-  const empresa = await prisma.empresa.findUnique({
-    where: { id: user.empresaId },
-    select: { plan: true },
-  });
-
   const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
   return (
@@ -63,7 +180,6 @@ export default async function PanelLayout({
               Historial
             </Link>
           )}
-
           <form
             action={async () => {
               "use server";
@@ -82,55 +198,44 @@ export default async function PanelLayout({
           </form>
         </div>
 
-        {/* Plan badge */}
+        {/* Plan badge — streams in without blocking */}
         <div className="border-t border-rail p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neon/20">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-ink">
-                {PLAN_LABEL[empresa?.plan ?? "trial"] ?? "Plan Trial"}
-              </p>
-              <p className="truncate text-[10px] text-fade">
-                {user.name ?? user.email}
-              </p>
-            </div>
-          </div>
+          <Suspense
+            fallback={
+              <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+                <div className="h-8 w-8 shrink-0 rounded-lg bg-neon/20" />
+                <div className="min-w-0 flex-1">
+                  <div className="h-3 w-20 animate-pulse rounded bg-neon/20" />
+                  <div className="mt-1 h-2.5 w-28 animate-pulse rounded bg-panel2" />
+                </div>
+              </div>
+            }
+          >
+            <PlanBadge
+              empresaId={user.empresaId}
+              displayName={user.name ?? user.email ?? ""}
+            />
+          </Suspense>
         </div>
       </aside>
 
       {/* ── Right side ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
 
-        {/* Top bar */}
+        {/* Top bar — avatar shown immediately, employee list streams in */}
         <header className="flex items-center gap-4 border-b border-rail bg-panel px-6 py-3">
-          <div className="relative max-w-md flex-1">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-ghost">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Buscar productos, movimientos..."
-              readOnly
-              title="Búsqueda global — próximamente"
-              className="w-full cursor-not-allowed rounded-lg border border-rail bg-panel2 py-2 pl-10 pr-28 text-sm opacity-50 transition-colors"
-            />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-rail px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ghost">
-              Próximamente
-            </span>
-          </div>
-
           <div className="ml-auto flex items-center gap-3">
-            {/* User menu */}
-            <UserMenu
-              inicial={inicial}
-              nombre={user.name ?? "Usuario"}
-              rol={user.rol?.toLowerCase() ?? "operador"}
-            />
+            <Suspense
+              fallback={
+                <UserMenuFallback
+                  inicial={inicial}
+                  nombre={user.name ?? "Usuario"}
+                  rol={user.rol?.toLowerCase() ?? "operador"}
+                />
+              }
+            >
+              <AsyncUserMenu user={user} inicial={inicial} />
+            </Suspense>
           </div>
         </header>
 

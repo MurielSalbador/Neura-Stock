@@ -8,15 +8,16 @@ const NAV_BASE = [
   { href: "/app/stock",       label: "Inventario",  exact: false, Icon: GridIcon },
   { href: "/app/productos",   label: "Productos",   exact: false, Icon: BoxIcon },
   { href: "/app/movimientos", label: "Movimientos", exact: false, Icon: ArrowsIcon },
-  { href: "/app/sucursales",  label: "Sucursales",  exact: false, Icon: BuildingIcon },
 ];
 
+const NAV_SUCURSALES = { href: "/app/sucursales", label: "Sucursales", exact: false, Icon: BuildingIcon };
 const NAV_ADMIN = { href: "/app/admin", label: "Equipo", exact: false, Icon: UsersIcon };
 
 export function NavLinks({ rol }: { rol?: string }) {
   const pathname = usePathname();
   const nav = [
     ...NAV_BASE,
+    ...(rol === "ADMIN" ? [NAV_SUCURSALES] : []),
     ...(rol === "ADMIN" || rol === "ENCARGADO" ? [NAV_ADMIN] : []),
   ];
 

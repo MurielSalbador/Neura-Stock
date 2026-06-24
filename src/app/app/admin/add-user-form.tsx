@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { crearUsuario, type AdminState } from "./actions";
 
 type Sucursal = { id: string; nombre: string };
@@ -18,10 +18,17 @@ export function AddUserForm({
 }) {
   const [state, action, pending] = useActionState(crearUsuario, inicial);
   const formRef = useRef<HTMLFormElement>(null);
+  const [rolSeleccionado, setRolSeleccionado] = useState("VENDEDOR");
 
   useEffect(() => {
-    if (state.ok) formRef.current?.reset();
+    if (state.ok) {
+      formRef.current?.reset();
+      setRolSeleccionado("VENDEDOR");
+    }
   }, [state.ok]);
+
+  // Multi-branch checkboxes when creating VENDEDOR with 2+ branches available
+  const mostrarCheckboxes = rolSeleccionado === "VENDEDOR" && sucursales.length > 1;
 
   return (
     <form ref={formRef} action={action} className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -59,7 +66,8 @@ export function AddUserForm({
 
       <select
         name="rol"
-        defaultValue="VENDEDOR"
+        value={rolSeleccionado}
+        onChange={(e) => setRolSeleccionado(e.target.value)}
         className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
       >
         <option value="VENDEDOR">Vendedor</option>
@@ -67,12 +75,30 @@ export function AddUserForm({
         {esAdmin && <option value="ADMIN">Admin global</option>}
       </select>
 
-      {esAdmin ? (
+      {/* Branch selection — checkboxes for VENDEDOR with 2+ branches, select otherwise */}
+      {mostrarCheckboxes ? (
+        <div className="sm:col-span-2 lg:col-span-2">
+          <p className="mb-1.5 text-xs font-medium text-fade">Sucursales</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {sucursales.map((s) => (
+              <label key={s.id} className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="sucursalIds"
+                  value={s.id}
+                  className="accent-neon"
+                />
+                <span className="text-sm text-ink">{s.nombre}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : esAdmin || sucursales.length > 1 ? (
         <select
           name="sucursalId"
           className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
         >
-          <option value="">Sin sucursal asignada</option>
+          {esAdmin && <option value="">Sin sucursal asignada</option>}
           {sucursales.map((s) => (
             <option key={s.id} value={s.id}>
               {s.nombre}

@@ -38,9 +38,13 @@ export default async function UsuarioHistorialPage({
   });
   if (!target) notFound();
 
-  // ENCARGADO solo puede ver usuarios de su propia sucursal
+  // ENCARGADO solo puede ver usuarios de sus sucursales asignadas
   if (admin.rol === "ENCARGADO" && target.rol === "ADMIN") notFound();
-  if (admin.rol === "ENCARGADO" && target.sucursalId !== admin.sucursalId) notFound();
+  if (
+    admin.rol === "ENCARGADO" &&
+    target.sucursalId &&
+    !admin.sucursalesIds.includes(target.sucursalId)
+  ) notFound();
 
   const [movimientos, conteoPorTipo] = await Promise.all([
     prisma.movimiento.findMany({

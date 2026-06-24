@@ -65,10 +65,11 @@ model Usuario {
   activo        Boolean   @default(true)
   creadoEn      DateTime  @default(now())
 
-  accounts    Account[]
-  sessions    Session[]
-  movimientos Movimiento[]
-  ventas      Venta[]
+  accounts              Account[]
+  sessions              Session[]
+  movimientos           Movimiento[]
+  ventas                Venta[]
+  sucursalesEncargado   SucursalEncargado[] @relation("EncargadoSucursales")
 
   @@index([empresaId])
 }
@@ -127,14 +128,26 @@ model Sucursal {
   activo    Boolean      @default(true)
   creadoEn  DateTime     @default(now())
 
-  usuarios           Usuario[]
-  stock              Stock[]
-  movimientosOrigen  Movimiento[] @relation("MovOrigen")
-  movimientosDestino Movimiento[] @relation("MovDestino")
-  compras            Compra[]
-  ventas             Venta[]
+  usuarios              Usuario[]
+  stock                 Stock[]
+  movimientosOrigen     Movimiento[] @relation("MovOrigen")
+  movimientosDestino    Movimiento[] @relation("MovDestino")
+  compras               Compra[]
+  ventas                Venta[]
+  encargadosAsignados   SucursalEncargado[] @relation("EncargadoSucursales")
 
   @@index([empresaId])
+}
+
+model SucursalEncargado {
+  usuarioId  String
+  usuario    Usuario  @relation("EncargadoSucursales", fields: [usuarioId], references: [id], onDelete: Cascade)
+  sucursalId String
+  sucursal   Sucursal @relation("EncargadoSucursales", fields: [sucursalId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, sucursalId])
+  @@index([usuarioId])
+  @@index([sucursalId])
 }
 
 // ============================================================

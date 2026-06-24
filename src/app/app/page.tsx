@@ -62,19 +62,42 @@ export default async function DashboardPage({
   const user = await requireUser();
   const { sucursal: sucursalFiltro } = await searchParams;
   const empresaId = user.empresaId;
+  const misIds = user.sucursalesIds; // branches del encargado (vacío para ADMIN/VENDEDOR)
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+  // Scope base de movimientos según el rol
   const movWhere =
     user.rol === "VENDEDOR"
       ? { empresaId, usuarioId: user.id }
       : { empresaId };
 
+  // Sucursales propias para ENCARGADO y VENDEDOR multi-branch
+  const rolSucursalIds =
+    (user.rol === "ENCARGADO" || user.rol === "VENDEDOR") && misIds.length > 0 ? misIds : null;
+
+  // Para ENCARGADO: filtrar solo por sus sucursales cuando no hay filtro manual
+  const encargadoSucursalIds =
+    user.rol === "ENCARGADO" && misIds.length > 0 ? misIds : null;
+
+  // Sucursal efectiva para filtrar el panel de detalle
+  let sucursalEfectiva: string | undefined;
+  if (sucursalFiltro) {
+    sucursalEfectiva = sucursalFiltro;
+  } else if (user.rol === "ENCARGADO" && misIds.length === 1) {
+    sucursalEfectiva = misIds[0];
+  }
+
   // Recent movements where clause — adds branch filter when selected
   const movRecientesWhere = {
     ...movWhere,
-    ...(sucursalFiltro
-      ? { OR: [{ sucursalOrigenId: sucursalFiltro }, { sucursalDestinoId: sucursalFiltro }] }
+    ...(sucursalEfectiva
+      ? { OR: [{ sucursalOrigenId: sucursalEfectiva }, { sucursalDestinoId: sucursalEfectiva }] }
+      : encargadoSucursalIds
+      ? { OR: [
+          { sucursalOrigenId: { in: encargadoSucursalIds } },
+          { sucursalDestinoId: { in: encargadoSucursalIds } },
+        ] }
       : {}),
   };
 
@@ -88,7 +111,11 @@ export default async function DashboardPage({
     productosLast7,
   ] = await Promise.all([
     prisma.sucursal.findMany({
-      where: { empresaId, activo: true },
+      where: {
+        empresaId,
+        activo: true,
+        ...(rolSucursalIds ? { id: { in: rolSucursalIds } } : {}),
+      },
       select: { id: true, nombre: true },
       orderBy: { creadoEn: "asc" },
     }),
@@ -97,8 +124,7 @@ export default async function DashboardPage({
     prisma.stock.findMany({
       where: {
         empresaId,
-        // VENDEDOR solo ve el stock de su sucursal.
-        ...(user.rol === "VENDEDOR" && user.sucursalId ? { sucursalId: user.sucursalId } : {}),
+        ...(rolSucursalIds ? { sucursalId: { in: rolSucursalIds } } : {}),
       },
       include: { producto: { select: { nombre: true, stockMinimo: true } } },
       take: 500,
@@ -174,9 +200,14 @@ export default async function DashboardPage({
   const movsEstaSemanana      = movsLast7.length;
   const productosEstaSemanana = productosLast7.length;
 
-  const sucursalNombre = sucursalFiltro
-    ? sucursalesList.find((s) => s.id === sucursalFiltro)?.nombre
+  const sucursalNombre = sucursalEfectiva
+    ? sucursalesList.find((s) => s.id === sucursalEfectiva)?.nombre
     : null;
+
+  // ADMIN, ENCARGADO y VENDEDOR con múltiples sucursales pueden elegir cuál ver
+  const mostrarSelectorSucursal =
+    sucursalesList.length > 1 &&
+    (user.rol === "ADMIN" || misIds.length > 1);
 
   return (
     <div className="space-y-6">
@@ -233,13 +264,13 @@ export default async function DashboardPage({
         />
       </div>
 
-      {/* Branch filter bar for the detail panels */}
-      {sucursalesList.length > 1 && (
+      {/* Branch filter bar — visible para ADMIN y ENCARGADO con múltiples sucursales */}
+      {mostrarSelectorSucursal && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
           <p className="text-xs font-medium text-fade">
             {sucursalNombre ? `Mostrando: ${sucursalNombre}` : "Detalle de todas las sucursales"}
           </p>
-          <SucursalSelector sucursales={sucursalesList} current={sucursalFiltro ?? ""} />
+          <SucursalSelector sucursales={sucursalesList} current={sucursalEfectiva ?? ""} />
         </div>
       )}
 

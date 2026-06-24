@@ -2,11 +2,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { alternarUsuario, eliminarUsuario, limpiarMovimientos, limpiarTodo } from "./actions";
+import { alternarUsuario, eliminarUsuario, limpiarMovimientos, limpiarTodo, asignarSucursalesEncargado, asignarSucursalesVendedor } from "./actions";
 import { RoleSelect } from "./role-select";
 import { AddUserForm } from "./add-user-form";
 import { SucursalSelector } from "../sucursal-selector";
 import { ConfirmButton } from "../confirm-button";
+import { EncargadoBranchPicker } from "./encargado-branch-picker";
+import { EditUserDialog } from "./edit-user-dialog";
 
 const ROL_LABEL: Record<string, string> = {
   ADMIN:     "Admin global",
@@ -31,16 +33,20 @@ export default async function AdminPage({
   const { sucursal: sucursalFiltro } = await searchParams;
   const esAdmin = user.rol === "ADMIN";
 
-  // ENCARGADO defaults to their own branch
+  const misIds = user.sucursalesIds;
+
   const sucursalEfectiva =
     user.rol === "ENCARGADO" && !sucursalFiltro
-      ? (user.sucursalId ?? undefined)
+      ? (misIds.length === 1 ? misIds[0] : undefined)
       : sucursalFiltro;
 
   const [todosUsuarios, sucursales] = await Promise.all([
     prisma.usuario.findMany({
       where: { empresaId: user.empresaId },
-      include: { sucursal: { select: { nombre: true, id: true } } },
+      include: {
+        sucursal: { select: { nombre: true, id: true } },
+        sucursalesEncargado: { select: { sucursalId: true, sucursal: { select: { nombre: true } } } },
+      },
       orderBy: [{ rol: "asc" }, { creadoEn: "asc" }],
     }),
     prisma.sucursal.findMany({
@@ -50,12 +56,7 @@ export default async function AdminPage({
     }),
   ]);
 
-  // ENCARGADO sin sucursal asignada: solo se ve a sí mismo.
-  if (!esAdmin && !user.sucursalId) {
-    const soloYo = todosUsuarios.filter((u) => u.id === user.id);
-    const usuarios = soloYo;
-    const totalActivos   = usuarios.filter((u) => u.activo).length;
-    const totalInactivos = usuarios.filter((u) => !u.activo).length;
+  if (!esAdmin && misIds.length === 0) {
     return (
       <div className="space-y-6">
         <header>
@@ -66,14 +67,24 @@ export default async function AdminPage({
     );
   }
 
-  // Apply branch filter to users list; ENCARGADO never sees ADMINs
   const usuariosFiltradosPorRol = esAdmin
     ? todosUsuarios
     : todosUsuarios.filter((u) => u.rol !== "ADMIN");
 
-  const usuarios = sucursalEfectiva
-    ? usuariosFiltradosPorRol.filter((u) => u.sucursalId === sucursalEfectiva)
-    : usuariosFiltradosPorRol;
+  // Helper: check if a user belongs to a given branch (via sucursalId or SucursalEncargado)
+  const userInBranch = (u: typeof todosUsuarios[0], branchId: string) =>
+    u.sucursalId === branchId || u.sucursalesEncargado.some((se) => se.sucursalId === branchId);
+
+  let usuarios;
+  if (sucursalEfectiva) {
+    usuarios = usuariosFiltradosPorRol.filter((u) => userInBranch(u, sucursalEfectiva));
+  } else if (!esAdmin && misIds.length > 0) {
+    usuarios = usuariosFiltradosPorRol.filter(
+      (u) => misIds.some((mid) => userInBranch(u, mid)),
+    );
+  } else {
+    usuarios = usuariosFiltradosPorRol;
+  }
 
   const totalActivos   = usuarios.filter((u) => u.activo).length;
   const totalInactivos = usuarios.filter((u) => !u.activo).length;
@@ -82,6 +93,10 @@ export default async function AdminPage({
     ? sucursales.find((s) => s.id === sucursalEfectiva)?.nombre
     : null;
 
+  const sucursalesVisibles = esAdmin
+    ? sucursales
+    : sucursales.filter((s) => misIds.includes(s.id));
+
   return (
     <div className="space-y-6">
       <header>
@@ -89,22 +104,20 @@ export default async function AdminPage({
         <p className="mt-0.5 text-sm text-fade">Todos los usuarios de la empresa</p>
       </header>
 
-      {/* Branch filter */}
-      {sucursales.length > 1 && (
+      {sucursalesVisibles.length > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
           <p className="text-xs font-medium text-fade">
             {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}
           </p>
-          <SucursalSelector sucursales={sucursales} current={sucursalFiltro ?? ""} />
+          <SucursalSelector sucursales={sucursalesVisibles} current={sucursalFiltro ?? ""} />
         </div>
       )}
 
-      {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total",    valor: usuarios.length,  color: "text-ink" },
-          { label: "Activos",  valor: totalActivos,     color: "text-success" },
-          { label: "Inactivos", valor: totalInactivos,  color: "text-fade" },
+          { label: "Total",     valor: usuarios.length,  color: "text-ink" },
+          { label: "Activos",   valor: totalActivos,     color: "text-success" },
+          { label: "Inactivos", valor: totalInactivos,   color: "text-fade" },
         ].map(({ label, valor, color }) => (
           <div key={label} className="rounded-xl border border-rail bg-panel p-4">
             <p className="text-xs text-fade">{label}</p>
@@ -113,7 +126,6 @@ export default async function AdminPage({
         ))}
       </div>
 
-      {/* Users table */}
       <div className="overflow-hidden rounded-xl border border-rail bg-panel">
         <table className="w-full text-sm">
           <thead>
@@ -128,6 +140,9 @@ export default async function AdminPage({
                 Sucursal
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                Sucursales
+              </th>
+              <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Estado
               </th>
               <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
@@ -137,11 +152,38 @@ export default async function AdminPage({
           </thead>
           <tbody className="divide-y divide-rail">
             {usuarios.map((u) => {
-              const esYo            = u.id === user.id;
-              const esAdminGlobal   = u.rol === "ADMIN";
-              const enMiSucursal    = esAdmin || (!!user.sucursalId && u.sucursalId === user.sucursalId);
-              const puedeModificar  = !esYo && !esAdminGlobal && enMiSucursal;
+              const esYo          = u.id === user.id;
+              const esAdminGlobal = u.rol === "ADMIN";
+              const enMiSucursal  = esAdmin || (misIds.length > 0 && misIds.some((mid) => userInBranch(u, mid)));
+              // ENCARGADO solo puede modificar VENDEDORs; ADMIN puede modificar cualquier no-ADMIN
+              const puedeModificar = !esYo && !esAdminGlobal && enMiSucursal &&
+                (esAdmin || u.rol === "VENDEDOR");
               const inicial = (u.nombre ?? u.email).charAt(0).toUpperCase();
+
+              // Branches for the multi-column picker
+              const sucursalesDeEsteEncargado = u.sucursalesEncargado.map((se) => ({
+                id: se.sucursalId,
+                nombre: se.sucursal.nombre,
+              }));
+
+              // For VENDEDOR: show SucursalEncargado entries, fall back to primary branch
+              const sucursalesDeEsteVendedor =
+                u.sucursalesEncargado.length > 0
+                  ? u.sucursalesEncargado.map((se) => ({
+                      id: se.sucursalId,
+                      nombre: se.sucursal.nombre,
+                    }))
+                  : u.sucursal
+                  ? [{ id: u.sucursal.id, nombre: u.sucursal.nombre }]
+                  : [];
+
+              // Current branch IDs for the edit dialog
+              const sucursalesActualesIds =
+                u.sucursalesEncargado.length > 0
+                  ? u.sucursalesEncargado.map((se) => se.sucursalId)
+                  : u.sucursalId
+                  ? [u.sucursalId]
+                  : [];
 
               return (
                 <tr key={u.id} className="transition-colors hover:bg-panel2">
@@ -182,9 +224,30 @@ export default async function AdminPage({
                     )}
                   </td>
 
-                  {/* Branch */}
+                  {/* Primary branch */}
                   <td className="px-5 py-3 text-sm text-fade">
                     {u.sucursal?.nombre ?? <span className="text-ghost">—</span>}
+                  </td>
+
+                  {/* Multi-branch picker */}
+                  <td className="px-5 py-3">
+                    {u.rol === "ENCARGADO" && esAdmin ? (
+                      <EncargadoBranchPicker
+                        usuarioId={u.id}
+                        todasSucursales={sucursales}
+                        asignadas={sucursalesDeEsteEncargado}
+                        action={asignarSucursalesEncargado}
+                      />
+                    ) : u.rol === "VENDEDOR" && puedeModificar ? (
+                      <EncargadoBranchPicker
+                        usuarioId={u.id}
+                        todasSucursales={sucursalesVisibles}
+                        asignadas={sucursalesDeEsteVendedor}
+                        action={asignarSucursalesVendedor}
+                      />
+                    ) : (
+                      <span className="text-ghost">—</span>
+                    )}
                   </td>
 
                   {/* Status */}
@@ -200,13 +263,27 @@ export default async function AdminPage({
 
                   {/* Actions */}
                   <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-4">
+                    <div className="flex items-center justify-end gap-3">
                       <Link
                         href={`/app/admin/${u.id}`}
                         className="text-xs font-medium text-neon hover:underline"
                       >
-                        Ver actividad
+                        Actividad
                       </Link>
+                      {puedeModificar && (
+                        <EditUserDialog
+                          usuario={{
+                            id: u.id,
+                            nombre: u.nombre,
+                            email: u.email,
+                            rol: u.rol,
+                            sucursalId: u.sucursalId,
+                          }}
+                          sucursalesDisponibles={sucursalesVisibles}
+                          sucursalesActuales={sucursalesActualesIds}
+                          esAdmin={esAdmin}
+                        />
+                      )}
                       {puedeModificar && (
                         <form action={alternarUsuario}>
                           <input type="hidden" name="usuarioId" value={u.id} />
@@ -233,7 +310,7 @@ export default async function AdminPage({
             })}
             {usuarios.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-sm text-fade">
+                <td colSpan={6} className="px-5 py-12 text-center text-sm text-fade">
                   {sucursalNombre ? `No hay usuarios en ${sucursalNombre}` : "No hay usuarios todavía"}
                 </td>
               </tr>
@@ -242,17 +319,21 @@ export default async function AdminPage({
         </table>
       </div>
 
-      {/* Add user */}
       <div className="rounded-xl border border-rail bg-panel p-5">
         <h2 className="mb-4 text-sm font-semibold text-ink">Agregar usuario</h2>
         <AddUserForm
-          sucursales={sucursales}
+          sucursales={sucursalesVisibles}
           esAdmin={esAdmin}
-          sucursalFijaNombre={!esAdmin ? (todosUsuarios.find((u) => u.id === user.id)?.sucursal?.nombre ?? undefined) : undefined}
+          sucursalFijaNombre={
+            !esAdmin
+              ? (misIds.length === 1
+                  ? sucursales.find((s) => s.id === misIds[0])?.nombre
+                  : undefined)
+              : undefined
+          }
         />
       </div>
 
-      {/* Limpieza de datos — solo ADMIN */}
       {esAdmin && (
         <div className="rounded-xl border border-danger/30 bg-panel p-5">
           <h2 className="mb-1 text-sm font-semibold text-danger">Limpieza de datos</h2>

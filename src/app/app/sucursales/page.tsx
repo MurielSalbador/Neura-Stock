@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { alternarSucursal } from "./actions";
@@ -5,7 +6,8 @@ import { SucursalForm } from "./sucursal-form";
 
 export default async function SucursalesPage() {
   const user = await requireUser();
-  const esAdmin = user.rol === "ADMIN";
+  if (user.rol !== "ADMIN") redirect("/app");
+  const esAdmin = true;
 
   // ADMIN ve todas (incluye inactivas para poder reactivarlas).
   // Otros roles solo ven las activas.
