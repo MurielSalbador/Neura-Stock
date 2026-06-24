@@ -79,22 +79,6 @@ Cada movimiento registra: usuario, fecha/hora, sucursal/es involucradas, product
 
 ---
 
-### Ventas y compras
-
-- Registro de ventas con líneas de detalle (producto × cantidad × precio)
-- Registro de compras por proveedor con líneas de detalle
-- Cada operación genera automáticamente su movimiento de stock correspondiente
-
----
-
-### Clientes y proveedores
-
-- ABM completo de clientes con seguimiento de cuenta corriente
-- ABM completo de proveedores
-- Historial de operaciones asociadas
-
----
-
 ### Historial de actividad
 
 Log completo y filtrable de todos los movimientos de la empresa:
@@ -232,8 +216,7 @@ stock-neura/
     │   │   ├── productos/         ← Catálogo: alta, edición, búsqueda
     │   │   ├── sucursales/        ← Gestión de locales y depósitos
     │   │   ├── admin/             ← Equipo: usuarios, roles, activación
-    │   │   ├── historial/         ← Log completo de actividad filtrable
-    │   │   └── user-menu/         ← Cuenta y cierre de sesión
+    │   │   └── historial/         ← Log completo de actividad filtrable
     │   │
     │   ├── login/             ← Inicio de sesión con credenciales
     │   └── registro/          ← Onboarding: alta de nueva empresa
@@ -314,10 +297,10 @@ Cada `git push` a `main` dispara automáticamente un build y deploy en Vercel. L
 - [x] CRUD completo de productos, sucursales, usuarios
 - [x] Registro y auditoría de movimientos de stock
 - [x] Dashboard con KPIs, alertas y actividad reciente
-- [x] Ventas y compras con líneas de detalle
-- [x] Gestión de clientes y proveedores
 
 ### Etapa 2 — próximamente
+- [ ] Ventas y compras con líneas de detalle
+- [ ] Gestión de clientes y proveedores
 - [ ] Escaneo de código de barras desde dispositivos móviles
 - [ ] Cuenta corriente de clientes con saldo y pagos
 - [ ] Seguimiento de lotes y vencimientos (farmacias)
