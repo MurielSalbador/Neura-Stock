@@ -14,9 +14,9 @@ export default async function StockPage({
   const { sucursal: sucursalFiltro } = await searchParams;
   const empresaId = user.empresaId;
 
-  // ENCARGADO defaults to their branch
+  // VENDEDOR y ENCARGADO solo ven su sucursal por defecto.
   const sucursalEfectiva =
-    user.rol === "ENCARGADO" && !sucursalFiltro
+    (user.rol === "VENDEDOR" || user.rol === "ENCARGADO") && !sucursalFiltro
       ? (user.sucursalId ?? undefined)
       : sucursalFiltro;
 
@@ -51,8 +51,8 @@ export default async function StockPage({
         </p>
       </header>
 
-      {/* Branch filter */}
-      {todasSucursales.length > 1 && (
+      {/* Branch filter — solo ADMIN puede cambiar de sucursal */}
+      {todasSucursales.length > 1 && user.rol === "ADMIN" && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
           <p className="text-xs font-medium text-fade">
             {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}

@@ -6,7 +6,8 @@ import { ConfirmButton } from "../confirm-button";
 
 export default async function ProductosPage() {
   const user = await requireUser();
-  const esAdmin = user.rol === "ADMIN";
+  const esAdmin    = user.rol === "ADMIN";
+  const puedeCrear = user.rol !== "VENDEDOR";
 
   const [productos, sucursales] = await Promise.all([
     prisma.producto.findMany({
@@ -28,11 +29,13 @@ export default async function ProductosPage() {
         <p className="mt-0.5 text-sm text-fade">Tu catálogo de productos</p>
       </header>
 
-      {/* Nuevo producto */}
-      <div className="rounded-xl border border-rail bg-panel p-5">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Nuevo producto</h2>
-        <ProductoForm sucursales={sucursales} />
-      </div>
+      {/* Nuevo producto — oculto para VENDEDOR */}
+      {puedeCrear && (
+        <div className="rounded-xl border border-rail bg-panel p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Nuevo producto</h2>
+          <ProductoForm sucursales={sucursales} />
+        </div>
+      )}
 
       {/* Tabla */}
       <div className="overflow-hidden rounded-xl border border-rail bg-panel">

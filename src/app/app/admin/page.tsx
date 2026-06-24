@@ -50,6 +50,22 @@ export default async function AdminPage({
     }),
   ]);
 
+  // ENCARGADO sin sucursal asignada: solo se ve a sí mismo.
+  if (!esAdmin && !user.sucursalId) {
+    const soloYo = todosUsuarios.filter((u) => u.id === user.id);
+    const usuarios = soloYo;
+    const totalActivos   = usuarios.filter((u) => u.activo).length;
+    const totalInactivos = usuarios.filter((u) => !u.activo).length;
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold text-ink">Equipo</h1>
+          <p className="mt-0.5 text-sm text-fade">No tenés una sucursal asignada. Contactá a tu administrador.</p>
+        </header>
+      </div>
+    );
+  }
+
   // Apply branch filter to users list; ENCARGADO never sees ADMINs
   const usuariosFiltradosPorRol = esAdmin
     ? todosUsuarios

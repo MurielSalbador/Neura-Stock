@@ -36,7 +36,10 @@ export default async function MovimientosPage({
       ? (user.sucursalId ?? undefined)
       : sucursalFiltro;
 
-  const movWhere: Record<string, unknown> = esVendedor
+  // ENCARGADO sin sucursal asignada solo ve sus propios movimientos.
+  const encargadoSinSucursal = user.rol === "ENCARGADO" && !user.sucursalId;
+
+  const movWhere: Record<string, unknown> = esVendedor || encargadoSinSucursal
     ? { empresaId, usuarioId: user.id }
     : {
         empresaId,
@@ -52,7 +55,12 @@ export default async function MovimientosPage({
       select: { id: true, nombre: true, sku: true },
     }),
     prisma.sucursal.findMany({
-      where: { empresaId, activo: true },
+      where: {
+        empresaId,
+        activo: true,
+        // VENDEDOR solo ve (y puede operar en) su propia sucursal.
+        ...(user.rol === "VENDEDOR" && user.sucursalId ? { id: user.sucursalId } : {}),
+      },
       orderBy: { creadoEn: "asc" },
       select: { id: true, nombre: true },
     }),
@@ -84,8 +92,8 @@ export default async function MovimientosPage({
         </p>
       </header>
 
-      {/* Branch filter — only for ADMIN/ENCARGADO with multiple branches */}
-      {!esVendedor && sucursales.length > 1 && (
+      {/* Branch filter — solo ADMIN cambia de sucursal; ENCARGADO y VENDEDOR ven la suya */}
+      {esAdmin && sucursales.length > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
           <p className="text-xs font-medium text-fade">
             {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}
@@ -103,7 +111,7 @@ export default async function MovimientosPage({
       ) : (
         <div className="rounded-xl border border-rail bg-panel p-5">
           <h2 className="mb-4 text-sm font-semibold text-ink">Nuevo movimiento</h2>
-          <MovForm productos={productos} sucursales={sucursales} />
+          <MovForm productos={productos} sucursales={sucursales} esVendedor={esVendedor} />
         </div>
       )}
 

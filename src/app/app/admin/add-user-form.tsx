@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { crearUsuario, type AdminState } from "./actions";
 
 type Sucursal = { id: string; nombre: string };
@@ -19,7 +19,9 @@ export function AddUserForm({
   const [state, action, pending] = useActionState(crearUsuario, inicial);
   const formRef = useRef<HTMLFormElement>(null);
 
-  if (state.ok) formRef.current?.reset();
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state.ok]);
 
   return (
     <form ref={formRef} action={action} className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">

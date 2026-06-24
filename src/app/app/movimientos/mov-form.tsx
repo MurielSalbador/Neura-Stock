@@ -10,20 +10,25 @@ const inicial: MovState = {};
 export function MovForm({
   productos,
   sucursales,
+  esVendedor = false,
 }: {
   productos: { id: string; nombre: string; sku: string }[];
   sucursales: Opt[];
+  esVendedor?: boolean;
 }) {
   const [state, action, pending] = useActionState(nuevoMovimiento, inicial);
-  const [tipo, setTipo] = useState("ENTRADA");
+  const [tipo, setTipo] = useState(esVendedor ? "SALIDA" : "ENTRADA");
   const formRef = useRef<HTMLFormElement>(null);
 
   const usaOrigen  = tipo !== "ENTRADA";
   const usaDestino = tipo === "ENTRADA" || tipo === "TRANSFERENCIA";
 
   useEffect(() => {
-    if (state.ok) formRef.current?.reset();
-  }, [state.ok]);
+    if (state.ok) {
+      formRef.current?.reset();
+      setTipo(esVendedor ? "SALIDA" : "ENTRADA");
+    }
+  }, [state.ok, esVendedor]);
 
   return (
     <form ref={formRef} action={action} className="grid gap-4 md:grid-cols-2">
@@ -43,12 +48,13 @@ export function MovForm({
           name="tipo"
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
+          disabled={esVendedor}
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors disabled:opacity-60"
         >
-          <option value="ENTRADA">Entrada (compra / ingreso)</option>
+          {!esVendedor && <option value="ENTRADA">Entrada (compra / ingreso)</option>}
           <option value="SALIDA">Salida (venta / egreso)</option>
-          <option value="TRANSFERENCIA">Transferencia entre sucursales</option>
-          <option value="AJUSTE">Ajuste (conteo / merma)</option>
+          {!esVendedor && <option value="TRANSFERENCIA">Transferencia entre sucursales</option>}
+          {!esVendedor && <option value="AJUSTE">Ajuste (conteo / merma)</option>}
         </select>
       </Campo>
 
@@ -124,6 +130,18 @@ export function MovForm({
         <button
           disabled={pending}
           className="rounded-lg bg-neon/15 px-5 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25 disabled:opacity-40"
+          onClick={(e) => {
+            if (tipo === "TRANSFERENCIA") {
+              const form = formRef.current;
+              if (!form) return;
+              const origen  = (form.elements.namedItem("sucursalOrigenId")  as HTMLSelectElement)?.value;
+              const destino = (form.elements.namedItem("sucursalDestinoId") as HTMLSelectElement)?.value;
+              if (origen && destino && origen === destino) {
+                e.preventDefault();
+                alert("La sucursal de origen y destino no pueden ser la misma.");
+              }
+            }
+          }}
         >
           {pending ? "Registrando…" : "Registrar movimiento →"}
         </button>

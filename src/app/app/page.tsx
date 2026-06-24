@@ -95,7 +95,11 @@ export default async function DashboardPage({
     prisma.producto.count({ where: { empresaId, activo: true } }),
     prisma.movimiento.count({ where: movWhere }),
     prisma.stock.findMany({
-      where: { empresaId },
+      where: {
+        empresaId,
+        // VENDEDOR solo ve el stock de su sucursal.
+        ...(user.rol === "VENDEDOR" && user.sucursalId ? { sucursalId: user.sucursalId } : {}),
+      },
       include: { producto: { select: { nombre: true, stockMinimo: true } } },
       take: 500,
     }),

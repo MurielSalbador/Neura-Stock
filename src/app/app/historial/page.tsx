@@ -29,9 +29,24 @@ export default async function HistorialPage() {
 
   const empresaId = user.empresaId;
 
+  // ENCARGADO con sucursal: solo ve los movimientos de su sucursal.
+  // ENCARGADO sin sucursal: solo ve sus propios movimientos.
+  const whereBase =
+    user.rol === "ENCARGADO"
+      ? user.sucursalId
+        ? {
+            empresaId,
+            OR: [
+              { sucursalOrigenId: user.sucursalId },
+              { sucursalDestinoId: user.sucursalId },
+            ],
+          }
+        : { empresaId, usuarioId: user.id }
+      : { empresaId };
+
   const [movimientos, conteoPorTipo] = await Promise.all([
     prisma.movimiento.findMany({
-      where: { empresaId },
+      where: whereBase,
       orderBy: { creadoEn: "desc" },
       take: 200,
       include: {
@@ -43,7 +58,7 @@ export default async function HistorialPage() {
     }),
     prisma.movimiento.groupBy({
       by: ["tipo"],
-      where: { empresaId },
+      where: whereBase,
       _count: { tipo: true },
     }),
   ]);

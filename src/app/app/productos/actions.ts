@@ -48,6 +48,7 @@ export async function crearProducto(
   formData: FormData,
 ): Promise<ProductoState> {
   const user = await requireUser();
+  if (user.rol === "VENDEDOR") return { error: "Sin permiso para crear productos" };
   const parsed = schema.safeParse({
     sku: formData.get("sku"),
     nombre: formData.get("nombre"),

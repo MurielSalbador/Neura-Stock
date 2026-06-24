@@ -40,7 +40,7 @@ export async function eliminarMovimiento(formData: FormData): Promise<void> {
         if (mov.sucursalDestinoId) await revertir(mov.sucursalDestinoId, -cant);
         break;
       case "AJUSTE":
-        // cantidad siempre positiva en DB; revertimos como fue aplicado (positivo)
+        // cantidad guarda el delta con signo (puede ser negativo); -cant lo invierte.
         if (mov.sucursalOrigenId) await revertir(mov.sucursalOrigenId, -cant);
         break;
     }
@@ -74,6 +74,14 @@ export async function nuevoMovimiento(
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
   const d = parsed.data;
+
+  // VENDEDOR solo puede registrar salidas de su propia sucursal.
+  if (user.rol === "VENDEDOR") {
+    if (d.tipo !== "SALIDA") return { error: "Solo podés registrar salidas" };
+    if (user.sucursalId && d.sucursalOrigenId && d.sucursalOrigenId !== user.sucursalId) {
+      return { error: "Solo podés registrar movimientos de tu sucursal" };
+    }
+  }
 
   // Verifica que producto y sucursales pertenezcan a la empresa (tenant).
   const prod = await prisma.producto.findFirst({

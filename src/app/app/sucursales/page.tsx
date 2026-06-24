@@ -7,8 +7,10 @@ export default async function SucursalesPage() {
   const user = await requireUser();
   const esAdmin = user.rol === "ADMIN";
 
+  // ADMIN ve todas (incluye inactivas para poder reactivarlas).
+  // Otros roles solo ven las activas.
   const sucursales = await prisma.sucursal.findMany({
-    where: { empresaId: user.empresaId },
+    where: { empresaId: user.empresaId, ...(esAdmin ? {} : { activo: true }) },
     orderBy: { creadoEn: "asc" },
   });
 
