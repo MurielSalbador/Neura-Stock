@@ -1,0 +1,31 @@
+fix: corregir 23 bugs de seguridad, validación y lógica de negocio
+Seguridad y aislamiento multi-tenant:
+- Validar empresaId en sucursalOrigenId/sucursalDestinoId al registrar movimientos
+- VENDEDOR restringido a SALIDA desde su propia sucursal únicamente
+- ENCARGADO sin sucursal no puede gestionar usuarios (null !== null fix)
+- ENCARGADO solo ve actividad de usuarios de su propia sucursal
+- Reemplazar check-then-insert por captura de P2002 para evitar race condition en unicidad de email
+Lógica de stock:
+- Bug crítico: AJUSTE guarda delta con signo; reversión ahora correcta para ajustes negativos
+- Validación de stock suficiente antes de SALIDA, TRANSFERENCIA y AJUSTE negativo
+Autorización por rol:
+- VENDEDOR bloqueado de crear productos, ENTRADA y TRANSFERENCIA (server + UI)
+- ENCARGADO sin sucursal ve pantalla de aviso en lugar de todos los usuarios
+- ENCARGADO solo ve movimientos e historial de su sucursal
+- SucursalSelector solo visible para ADMIN (ENCARGADO y VENDEDOR no cambian de sucursal)
+- VENDEDOR ve alertas de stock solo de su sucursal en el dashboard
+- Sucursales inactivas ocultas para roles no-admin
+Formularios y UX:
+- form.reset() movido a useEffect en MovForm y AddUserForm
+- Estado tipo reseteado correctamente al limpiar MovForm
+- Validación cliente-side origen != destino en transferencias
+- crearProducto y crearSucursal con feedback de error/éxito (useActionState)
+- Formulario de creación de productos oculto para VENDEDOR
+- Estadísticas de historial usan groupBy real en lugar del subconjunto cargado
+Calidad:
+- Rol validado como z.enum() en crearUsuario (antes era cast sin validar)
+- Validaciones max() en todos los campos de registro
+- Query duplicada eliminada en admin page
+- Sparkline de alertas usa datos reales en lugar de array inventado
+- Límite take:500 en query de stock del dashboard
+- README inicial del proyecto
