@@ -31,11 +31,14 @@ El stock **no se modifica directamente**: cada entrada, salida, transferencia o 
 |---|---|
 | `/login` | Autenticación con email y contraseña |
 | `/registro` | Alta de empresa + primer usuario ADMIN |
-| `/app` | Dashboard con KPIs y alertas de stock bajo |
-| `/app/stock` | Vista de stock actual por producto y sucursal |
-| `/app/productos` | Catálogo: alta, edición y búsqueda de productos |
-| `/app/movimientos` | Registro de movimientos (entrada, salida, transferencia, ajuste) |
+| `/app` | Dashboard con KPIs, alertas y filtro por sucursal |
+| `/app/stock` | Vista de stock actual por producto y sucursal, con filtro por sucursal |
+| `/app/productos` | Catálogo: alta y eliminación de productos (con confirmación) |
+| `/app/movimientos` | Registro de movimientos con filtro por sucursal |
 | `/app/sucursales` | Gestión de locales y depósitos |
+| `/app/admin` | Gestión del equipo con filtro por sucursal |
+| `/app/admin/[id]` | Historial de actividad de un usuario específico |
+| `/app/historial` | Log completo de movimientos de la empresa (ADMIN/ENCARGADO) |
 
 ---
 
@@ -45,6 +48,7 @@ El stock **no se modifica directamente**: cada entrada, salida, transferencia o 
 - Stock en tiempo real por **producto × sucursal**
 - Alertas automáticas cuando el stock cae por debajo del mínimo configurado
 - Soporte para unidades fraccionarias (3 decimales de precisión)
+- Al eliminar un movimiento, el stock se **revierte automáticamente** al estado anterior
 
 ### Movimientos (fuente de verdad)
 - **ENTRADA** — compra o ingreso de mercadería
@@ -52,17 +56,39 @@ El stock **no se modifica directamente**: cada entrada, salida, transferencia o 
 - **TRANSFERENCIA** — movimiento entre sucursales (descuenta origen, acredita destino)
 - **AJUSTE** — corrección por conteo, merma o rotura (acepta cantidades negativas)
 
+### Filtro por sucursal
+Todas las vistas clave incluyen un selector de sucursal que filtra el contenido en tiempo real:
+
+| Vista | Comportamiento del filtro |
+|---|---|
+| **Dashboard** | Filtra "Productos con stock bajo" y "Últimos movimientos". Los KPIs superiores siempre muestran totales generales. |
+| **Inventario** | Muestra solo la sucursal seleccionada (vista de columna única) o todas. |
+| **Movimientos** | Filtra por sucursal de origen o destino. El ENCARGADO arranca en su sucursal por defecto. |
+| **Equipo** | Filtra usuarios por sucursal asignada. Los ADMINs siempre aparecen. El ENCARGADO arranca en su sucursal. |
+
 ### Multi-sucursal
 - Cantidad ilimitada de locales y/o depósitos por empresa
 - Cada usuario puede estar asignado a una sucursal específica
 - El stock se segmenta por sucursal, con totales consolidados en la vista general
+- El ENCARGADO ve su sucursal por defecto en todas las vistas
 
 ### Roles y permisos
 | Rol | Acceso |
 |---|---|
-| `ADMIN` | Todo: configuración, productos, reportes, gestión de usuarios |
-| `ENCARGADO` | Operaciones de su sucursal asignada |
-| `VENDEDOR` | Consulta y registro de movimientos de venta |
+| `ADMIN` | Todo: configuración, productos, movimientos, reportes, gestión de usuarios y limpieza de datos |
+| `ENCARGADO` | Operaciones de su sucursal asignada. Puede ver el historial de actividad de cualquier usuario de la empresa. |
+| `VENDEDOR` | Consulta y registro de sus propios movimientos |
+
+### Confirmaciones antes de eliminar
+Todas las acciones destructivas requieren confirmación explícita del usuario:
+- Eliminar un producto (avisa que se borran sus movimientos y stock)
+- Eliminar un movimiento (avisa que el stock se revertirá)
+- Eliminar un usuario
+- Borrar todos los movimientos y el stock (limpieza de datos)
+- Borrar todo el contenido de la empresa (limpieza de datos)
+
+### Historial de actividad por usuario
+Desde el panel de Equipo, ADMIN y ENCARGADO pueden ver el historial completo de movimientos de cualquier usuario, con estadísticas por tipo de movimiento.
 
 ### Catálogo de productos
 - SKU único por empresa + código de barras opcional
@@ -209,32 +235,42 @@ npx tsx scripts/smoke-stock.ts  # prueba el ciclo entrada→transferencia→sali
 ```
 src/
 ├── app/
-│   ├── layout.tsx          # Root layout + fuentes Geist
-│   ├── globals.css         # Design system completo (Tailwind v4 @theme)
-│   ├── page.tsx            # Redirect → /app o /login
-│   ├── login/              # Inicio de sesión
-│   ├── registro/           # Alta de empresa y primer admin
-│   └── app/                # Panel autenticado
-│       ├── layout.tsx      # Sidebar + nav principal
-│       ├── page.tsx        # Dashboard / KPIs
-│       ├── stock/          # Vista de stock actual
-│       ├── productos/      # Catálogo de productos
-│       ├── movimientos/    # Registro y listado de movimientos
-│       └── sucursales/     # Gestión de locales y depósitos
-├── auth.ts                 # Configuración de Auth.js (Node runtime)
-├── auth.config.ts          # Config edge-safe (middleware/proxy)
-├── proxy.ts                # Protección de rutas
+│   ├── layout.tsx              # Root layout + fuentes Geist
+│   ├── globals.css             # Design system completo (Tailwind v4 @theme)
+│   ├── page.tsx                # Redirect → /app o /login
+│   ├── login/                  # Inicio de sesión
+│   ├── registro/               # Alta de empresa y primer admin
+│   └── app/                    # Panel autenticado
+│       ├── layout.tsx          # Sidebar + nav principal
+│       ├── page.tsx            # Dashboard / KPIs (con filtro por sucursal)
+│       ├── sucursal-selector.tsx  # Componente cliente: selector de sucursal (todas las vistas)
+│       ├── confirm-button.tsx  # Componente cliente: botón con diálogo de confirmación
+│       ├── stock/              # Vista de inventario por sucursal (con filtro)
+│       ├── productos/          # Catálogo de productos (con confirmación al borrar)
+│       ├── movimientos/        # Registro y listado (con filtro por sucursal y confirmación)
+│       ├── sucursales/         # Gestión de locales y depósitos
+│       ├── historial/          # Log completo de movimientos (ADMIN/ENCARGADO)
+│       └── admin/              # Gestión del equipo (con filtro por sucursal)
+│           ├── page.tsx        # Lista de usuarios
+│           ├── actions.ts      # Acciones: crear, editar, eliminar usuarios
+│           ├── add-user-form.tsx
+│           ├── role-select.tsx
+│           └── [usuarioId]/
+│               └── page.tsx    # Historial de actividad del usuario
+├── auth.ts                     # Configuración de Auth.js (Node runtime)
+├── auth.config.ts              # Config edge-safe (middleware/proxy)
+├── proxy.ts                    # Protección de rutas
 ├── lib/
-│   ├── prisma.ts           # Cliente Prisma (singleton)
-│   ├── session.ts          # requireUser() — guard de sesión
-│   └── stock.ts            # Lógica de actualización de stock en transacción
+│   ├── prisma.ts               # Cliente Prisma (singleton)
+│   ├── session.ts              # requireUser() — guard de sesión
+│   └── stock.ts                # Lógica de actualización de stock en transacción
 └── generated/
-    └── prisma/             # Cliente Prisma generado automáticamente
+    └── prisma/                 # Cliente Prisma generado automáticamente
 prisma/
-└── schema.prisma           # Esquema de datos completo
+└── schema.prisma               # Esquema de datos completo
 scripts/
-├── smoke.ts                # Test de conectividad
-└── smoke-stock.ts          # Test del ciclo de movimientos
+├── smoke.ts                    # Test de conectividad
+└── smoke-stock.ts              # Test del ciclo de movimientos
 ```
 
 ---

@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { crearProducto, eliminarProducto } from "./actions";
+import { ConfirmButton } from "../confirm-button";
 
 export default async function ProductosPage() {
   const user = await requireUser();
@@ -97,9 +98,12 @@ export default async function ProductosPage() {
                     <td className="px-5 py-3 text-right">
                       <form action={eliminarProducto}>
                         <input type="hidden" name="id" value={p.id} />
-                        <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                        <ConfirmButton
+                          mensaje={`¿Eliminar el producto "${p.nombre}"? Se borrarán sus movimientos y stock asociados.`}
+                          className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70"
+                        >
                           Borrar
-                        </button>
+                        </ConfirmButton>
                       </form>
                     </td>
                   )}

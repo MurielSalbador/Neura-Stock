@@ -2,6 +2,8 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { MovForm } from "./mov-form";
 import { eliminarMovimiento } from "./actions";
+import { SucursalSelector } from "../sucursal-selector";
+import { ConfirmButton } from "../confirm-button";
 
 const ETIQUETA: Record<string, string> = {
   ENTRADA:       "ENTRADA",
@@ -17,16 +19,31 @@ const ETIQUETA_COLOR: Record<string, string> = {
   AJUSTE:        "bg-ghost/15 text-fade",
 };
 
-export default async function MovimientosPage() {
+export default async function MovimientosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sucursal?: string }>;
+}) {
   const user = await requireUser();
+  const { sucursal: sucursalFiltro } = await searchParams;
   const empresaId = user.empresaId;
   const esVendedor = user.rol === "VENDEDOR";
   const esAdmin = user.rol === "ADMIN";
 
-  const movWhere =
-    user.rol === "VENDEDOR"
-      ? { empresaId, usuarioId: user.id }
-      : { empresaId };
+  // VENDEDOR only sees own movements; ENCARGADO auto-filtered to their branch
+  const sucursalEfectiva =
+    user.rol === "ENCARGADO" && !sucursalFiltro
+      ? (user.sucursalId ?? undefined)
+      : sucursalFiltro;
+
+  const movWhere: Record<string, unknown> = esVendedor
+    ? { empresaId, usuarioId: user.id }
+    : {
+        empresaId,
+        ...(sucursalEfectiva
+          ? { OR: [{ sucursalOrigenId: sucursalEfectiva }, { sucursalDestinoId: sucursalEfectiva }] }
+          : {}),
+      };
 
   const [productos, sucursales, movimientos] = await Promise.all([
     prisma.producto.findMany({
@@ -52,6 +69,10 @@ export default async function MovimientosPage() {
     }),
   ]);
 
+  const sucursalNombre = sucursalEfectiva
+    ? sucursales.find((s) => s.id === sucursalEfectiva)?.nombre
+    : null;
+
   return (
     <div className="space-y-6">
       <header>
@@ -62,6 +83,16 @@ export default async function MovimientosPage() {
             : "Cada movimiento actualiza el stock · fuente de verdad"}
         </p>
       </header>
+
+      {/* Branch filter — only for ADMIN/ENCARGADO with multiple branches */}
+      {!esVendedor && sucursales.length > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
+          <p className="text-xs font-medium text-fade">
+            {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}
+          </p>
+          <SucursalSelector sucursales={sucursales} current={sucursalFiltro ?? ""} />
+        </div>
+      )}
 
       {productos.length === 0 || sucursales.length === 0 ? (
         <div className="rounded-xl border border-dashed border-rail bg-panel p-8 text-center">
@@ -98,7 +129,7 @@ export default async function MovimientosPage() {
                 </th>
               )}
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
-                Detalle
+                Sucursal / Detalle
               </th>
               {esAdmin && (
                 <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
@@ -128,17 +159,31 @@ export default async function MovimientosPage() {
                   </td>
                 )}
                 <td className="px-5 py-3 text-xs text-fade">
-                  {m.sucursalOrigen?.nombre && `desde ${m.sucursalOrigen.nombre} `}
-                  {m.sucursalDestino?.nombre && `→ ${m.sucursalDestino.nombre}`}
-                  {m.motivo && ` · ${m.motivo}`}
+                  {m.sucursalOrigen?.nombre && (
+                    <span className="rounded bg-panel2 px-1.5 py-0.5 text-[10px] font-medium text-fade">
+                      {m.sucursalOrigen.nombre}
+                    </span>
+                  )}
+                  {m.sucursalOrigen && m.sucursalDestino && (
+                    <span className="mx-1 text-ghost">→</span>
+                  )}
+                  {m.sucursalDestino?.nombre && (
+                    <span className="rounded bg-panel2 px-1.5 py-0.5 text-[10px] font-medium text-fade">
+                      {m.sucursalDestino.nombre}
+                    </span>
+                  )}
+                  {m.motivo && <span className="ml-1 text-ghost">· {m.motivo}</span>}
                 </td>
                 {esAdmin && (
                   <td className="px-5 py-3 text-right">
                     <form action={eliminarMovimiento}>
                       <input type="hidden" name="id" value={m.id} />
-                      <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                      <ConfirmButton
+                        mensaje="¿Eliminar este movimiento? El stock se revertirá automáticamente."
+                        className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70"
+                      >
                         Borrar
-                      </button>
+                      </ConfirmButton>
                     </form>
                   </td>
                 )}
@@ -147,7 +192,7 @@ export default async function MovimientosPage() {
             {movimientos.length === 0 && (
               <tr>
                 <td colSpan={esVendedor ? 5 : esAdmin ? 7 : 6} className="px-5 py-12 text-center text-sm text-fade">
-                  Sin movimientos todavía
+                  Sin movimientos{sucursalNombre ? ` en ${sucursalNombre}` : " todavía"}
                 </td>
               </tr>
             )}

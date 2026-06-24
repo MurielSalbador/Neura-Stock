@@ -38,10 +38,8 @@ export default async function UsuarioHistorialPage({
   });
   if (!target) notFound();
 
-  // ENCARGADO can only view users in their own branch
-  if (admin.rol === "ENCARGADO" && target.sucursalId !== admin.sucursalId) {
-    redirect("/app/admin");
-  }
+  // ENCARGADO cannot view ADMINs
+  if (admin.rol === "ENCARGADO" && target.rol === "ADMIN") notFound();
 
   const movimientos = await prisma.movimiento.findMany({
     where: { empresaId: admin.empresaId, usuarioId },

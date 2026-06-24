@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { alternarUsuario, eliminarUsuario, limpiarMovimientos, limpiarTodo } from "./actions";
 import { RoleSelect } from "./role-select";
 import { AddUserForm } from "./add-user-form";
+import { SucursalSelector } from "../sucursal-selector";
+import { ConfirmButton } from "../confirm-button";
 
 const ROL_LABEL: Record<string, string> = {
   ADMIN:     "Admin global",
@@ -18,16 +20,27 @@ const ROL_COLOR: Record<string, string> = {
   VENDEDOR:  "bg-ghost/15 text-fade",
 };
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sucursal?: string }>;
+}) {
   const user = await requireUser();
   if (user.rol !== "ADMIN" && user.rol !== "ENCARGADO") redirect("/app");
 
+  const { sucursal: sucursalFiltro } = await searchParams;
   const esAdmin = user.rol === "ADMIN";
 
-  const [usuarios, sucursales] = await Promise.all([
+  // ENCARGADO defaults to their own branch
+  const sucursalEfectiva =
+    user.rol === "ENCARGADO" && !sucursalFiltro
+      ? (user.sucursalId ?? undefined)
+      : sucursalFiltro;
+
+  const [todosUsuarios, sucursales] = await Promise.all([
     prisma.usuario.findMany({
       where: { empresaId: user.empresaId },
-      include: { sucursal: { select: { nombre: true } } },
+      include: { sucursal: { select: { nombre: true, id: true } } },
       orderBy: [{ rol: "asc" }, { creadoEn: "asc" }],
     }),
     esAdmin
@@ -36,11 +49,28 @@ export default async function AdminPage() {
           select: { id: true, nombre: true },
           orderBy: { nombre: "asc" },
         })
-      : Promise.resolve([]),
+      : prisma.sucursal.findMany({
+          where: { empresaId: user.empresaId, activo: true },
+          select: { id: true, nombre: true },
+          orderBy: { nombre: "asc" },
+        }),
   ]);
+
+  // Apply branch filter to users list; ENCARGADO never sees ADMINs
+  const usuariosFiltradosPorRol = esAdmin
+    ? todosUsuarios
+    : todosUsuarios.filter((u) => u.rol !== "ADMIN");
+
+  const usuarios = sucursalEfectiva
+    ? usuariosFiltradosPorRol.filter((u) => u.sucursalId === sucursalEfectiva)
+    : usuariosFiltradosPorRol;
 
   const totalActivos   = usuarios.filter((u) => u.activo).length;
   const totalInactivos = usuarios.filter((u) => !u.activo).length;
+
+  const sucursalNombre = sucursalEfectiva
+    ? sucursales.find((s) => s.id === sucursalEfectiva)?.nombre
+    : null;
 
   return (
     <div className="space-y-6">
@@ -48,6 +78,16 @@ export default async function AdminPage() {
         <h1 className="text-2xl font-bold text-ink">Equipo</h1>
         <p className="mt-0.5 text-sm text-fade">Todos los usuarios de la empresa</p>
       </header>
+
+      {/* Branch filter */}
+      {sucursales.length > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
+          <p className="text-xs font-medium text-fade">
+            {sucursalNombre ? `Sucursal: ${sucursalNombre}` : "Todas las sucursales"}
+          </p>
+          <SucursalSelector sucursales={sucursales} current={sucursalFiltro ?? ""} />
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
@@ -89,7 +129,6 @@ export default async function AdminPage() {
             {usuarios.map((u) => {
               const esYo            = u.id === user.id;
               const esAdminGlobal   = u.rol === "ADMIN";
-              // ENCARGADO can only modify users in their own branch
               const enMiSucursal    = esAdmin || (!!user.sucursalId && u.sucursalId === user.sucursalId);
               const puedeModificar  = !esYo && !esAdminGlobal && enMiSucursal;
               const inicial = (u.nombre ?? u.email).charAt(0).toUpperCase();
@@ -169,9 +208,12 @@ export default async function AdminPage() {
                       {esAdmin && !esYo && (
                         <form action={eliminarUsuario}>
                           <input type="hidden" name="usuarioId" value={u.id} />
-                          <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                          <ConfirmButton
+                            mensaje={`¿Eliminar al usuario "${u.nombre ?? u.email}"? Esta acción es irreversible.`}
+                            className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70"
+                          >
                             Eliminar
-                          </button>
+                          </ConfirmButton>
                         </form>
                       )}
                     </div>
@@ -182,7 +224,7 @@ export default async function AdminPage() {
             {usuarios.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-12 text-center text-sm text-fade">
-                  No hay usuarios todavía
+                  {sucursalNombre ? `No hay usuarios en ${sucursalNombre}` : "No hay usuarios todavía"}
                 </td>
               </tr>
             )}
@@ -196,7 +238,7 @@ export default async function AdminPage() {
         <AddUserForm
           sucursales={sucursales}
           esAdmin={esAdmin}
-          sucursalFijaNombre={!esAdmin ? (usuarios.find((u) => u.id === user.id)?.sucursal?.nombre ?? undefined) : undefined}
+          sucursalFijaNombre={!esAdmin ? (todosUsuarios.find((u) => u.id === user.id)?.sucursal?.nombre ?? undefined) : undefined}
         />
       </div>
 
@@ -209,14 +251,20 @@ export default async function AdminPage() {
           </p>
           <div className="flex flex-wrap gap-3">
             <form action={limpiarMovimientos}>
-              <button className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/20">
+              <ConfirmButton
+                mensaje="¿Borrar TODOS los movimientos y el stock? Esta acción es irreversible."
+                className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/20"
+              >
                 Borrar movimientos y stock
-              </button>
+              </ConfirmButton>
             </form>
             <form action={limpiarTodo}>
-              <button className="rounded-lg bg-danger/15 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/25">
+              <ConfirmButton
+                mensaje="¿Borrar TODO (productos, movimientos, ventas, compras)? Esta acción es COMPLETAMENTE irreversible."
+                className="rounded-lg bg-danger/15 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/25"
+              >
                 Borrar todo (productos, movimientos, ventas, compras)
-              </button>
+              </ConfirmButton>
             </form>
           </div>
         </div>
