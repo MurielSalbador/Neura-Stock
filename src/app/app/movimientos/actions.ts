@@ -6,6 +6,53 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { registrarMovimiento } from "@/lib/stock";
 
+export async function eliminarMovimiento(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  if (user.rol !== "ADMIN") return;
+
+  const id = formData.get("id") as string;
+  if (!id) return;
+
+  await prisma.$transaction(async (tx) => {
+    const mov = await tx.movimiento.findFirst({
+      where: { id, empresaId: user.empresaId },
+    });
+    if (!mov) return;
+
+    const revertir = async (sucursalId: string, delta: number) => {
+      await tx.stock.upsert({
+        where: { productoId_sucursalId: { productoId: mov.productoId, sucursalId } },
+        create: { empresaId: user.empresaId, productoId: mov.productoId, sucursalId, cantidad: delta },
+        update: { cantidad: { increment: delta } },
+      });
+    };
+
+    const cant = Number(mov.cantidad);
+    switch (mov.tipo) {
+      case "ENTRADA":
+        if (mov.sucursalDestinoId) await revertir(mov.sucursalDestinoId, -cant);
+        break;
+      case "SALIDA":
+        if (mov.sucursalOrigenId) await revertir(mov.sucursalOrigenId, cant);
+        break;
+      case "TRANSFERENCIA":
+        if (mov.sucursalOrigenId) await revertir(mov.sucursalOrigenId, cant);
+        if (mov.sucursalDestinoId) await revertir(mov.sucursalDestinoId, -cant);
+        break;
+      case "AJUSTE":
+        // cantidad siempre positiva en DB; revertimos como fue aplicado (positivo)
+        if (mov.sucursalOrigenId) await revertir(mov.sucursalOrigenId, -cant);
+        break;
+    }
+
+    await tx.movimiento.delete({ where: { id } });
+  });
+
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/stock");
+  revalidatePath("/app");
+}
+
 const schema = z.object({
   productoId: z.string().min(1),
   tipo: z.enum(["ENTRADA", "SALIDA", "TRANSFERENCIA", "AJUSTE"]),

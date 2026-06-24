@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { alternarUsuario, eliminarUsuario } from "./actions";
+import { alternarUsuario, eliminarUsuario, limpiarMovimientos, limpiarTodo } from "./actions";
 import { RoleSelect } from "./role-select";
 import { AddUserForm } from "./add-user-form";
 
@@ -24,13 +24,9 @@ export default async function AdminPage() {
 
   const esAdmin = user.rol === "ADMIN";
 
-  const [usuarios, sucursales, sucursalPropia] = await Promise.all([
+  const [usuarios, sucursales] = await Promise.all([
     prisma.usuario.findMany({
-      where: {
-        empresaId: user.empresaId,
-        // ENCARGADO only sees users in their own branch
-        ...(!esAdmin && user.sucursalId ? { sucursalId: user.sucursalId } : {}),
-      },
+      where: { empresaId: user.empresaId },
       include: { sucursal: { select: { nombre: true } } },
       orderBy: [{ rol: "asc" }, { creadoEn: "asc" }],
     }),
@@ -41,12 +37,6 @@ export default async function AdminPage() {
           orderBy: { nombre: "asc" },
         })
       : Promise.resolve([]),
-    !esAdmin && user.sucursalId
-      ? prisma.sucursal.findUnique({
-          where: { id: user.sucursalId },
-          select: { nombre: true },
-        })
-      : Promise.resolve(null),
   ]);
 
   const totalActivos   = usuarios.filter((u) => u.activo).length;
@@ -56,11 +46,7 @@ export default async function AdminPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-ink">Equipo</h1>
-        <p className="mt-0.5 text-sm text-fade">
-          {esAdmin
-            ? "Todos los usuarios de la empresa"
-            : `Usuarios de ${sucursalPropia?.nombre ?? "tu sucursal"}`}
-        </p>
+        <p className="mt-0.5 text-sm text-fade">Todos los usuarios de la empresa</p>
       </header>
 
       {/* Stats row */}
@@ -103,7 +89,9 @@ export default async function AdminPage() {
             {usuarios.map((u) => {
               const esYo            = u.id === user.id;
               const esAdminGlobal   = u.rol === "ADMIN";
-              const puedeModificar  = !esYo && (esAdmin || !esAdminGlobal);
+              // ENCARGADO can only modify users in their own branch
+              const enMiSucursal    = esAdmin || (!!user.sucursalId && u.sucursalId === user.sucursalId);
+              const puedeModificar  = !esYo && !esAdminGlobal && enMiSucursal;
               const inicial = (u.nombre ?? u.email).charAt(0).toUpperCase();
 
               return (
@@ -208,9 +196,31 @@ export default async function AdminPage() {
         <AddUserForm
           sucursales={sucursales}
           esAdmin={esAdmin}
-          sucursalFijaNombre={sucursalPropia?.nombre}
+          sucursalFijaNombre={!esAdmin ? (usuarios.find((u) => u.id === user.id)?.sucursal?.nombre ?? undefined) : undefined}
         />
       </div>
+
+      {/* Limpieza de datos — solo ADMIN */}
+      {esAdmin && (
+        <div className="rounded-xl border border-danger/30 bg-panel p-5">
+          <h2 className="mb-1 text-sm font-semibold text-danger">Limpieza de datos</h2>
+          <p className="mb-5 text-xs text-fade">
+            Estas acciones son irreversibles. Los usuarios y sucursales no se eliminan.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <form action={limpiarMovimientos}>
+              <button className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/20">
+                Borrar movimientos y stock
+              </button>
+            </form>
+            <form action={limpiarTodo}>
+              <button className="rounded-lg bg-danger/15 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/25">
+                Borrar todo (productos, movimientos, ventas, compras)
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

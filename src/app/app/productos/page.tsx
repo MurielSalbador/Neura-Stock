@@ -1,9 +1,10 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { crearProducto } from "./actions";
+import { crearProducto, eliminarProducto } from "./actions";
 
 export default async function ProductosPage() {
   const user = await requireUser();
+  const esAdmin = user.rol === "ADMIN";
 
   const productos = await prisma.producto.findMany({
     where: { empresaId: user.empresaId, activo: true },
@@ -76,6 +77,11 @@ export default async function ProductosPage() {
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Stock total
               </th>
+              {esAdmin && (
+                <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
+                  Acción
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
@@ -87,12 +93,22 @@ export default async function ProductosPage() {
                   <td className="px-5 py-3 font-semibold text-ink">{p.nombre}</td>
                   <td className="px-5 py-3 text-ink">${Number(p.precioVenta).toFixed(2)}</td>
                   <td className="px-5 py-3 font-bold text-success">{total}</td>
+                  {esAdmin && (
+                    <td className="px-5 py-3 text-right">
+                      <form action={eliminarProducto}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                          Borrar
+                        </button>
+                      </form>
+                    </td>
+                  )}
                 </tr>
               );
             })}
             {productos.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-5 py-12 text-center text-sm text-fade">
+                <td colSpan={esAdmin ? 5 : 4} className="px-5 py-12 text-center text-sm text-fade">
                   Todavía no cargaste productos
                 </td>
               </tr>

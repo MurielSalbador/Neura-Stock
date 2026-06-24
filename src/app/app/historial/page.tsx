@@ -28,38 +28,18 @@ export default async function HistorialPage() {
   if (user.rol === "VENDEDOR") redirect("/app");
 
   const empresaId = user.empresaId;
-  const esAdmin = user.rol === "ADMIN";
 
-  const movWhere =
-    user.rol === "ENCARGADO" && user.sucursalId
-      ? {
-          empresaId,
-          OR: [
-            { sucursalOrigenId: user.sucursalId },
-            { sucursalDestinoId: user.sucursalId },
-          ],
-        }
-      : { empresaId };
-
-  const [movimientos, sucursalPropia] = await Promise.all([
-    prisma.movimiento.findMany({
-      where: movWhere,
-      orderBy: { creadoEn: "desc" },
-      take: 200,
-      include: {
-        producto:        { select: { nombre: true } },
-        sucursalOrigen:  { select: { nombre: true } },
-        sucursalDestino: { select: { nombre: true } },
-        usuario:         { select: { nombre: true, rol: true } },
-      },
-    }),
-    !esAdmin && user.sucursalId
-      ? prisma.sucursal.findUnique({
-          where: { id: user.sucursalId },
-          select: { nombre: true },
-        })
-      : Promise.resolve(null),
-  ]);
+  const movimientos = await prisma.movimiento.findMany({
+    where: { empresaId },
+    orderBy: { creadoEn: "desc" },
+    take: 200,
+    include: {
+      producto:        { select: { nombre: true } },
+      sucursalOrigen:  { select: { nombre: true } },
+      sucursalDestino: { select: { nombre: true } },
+      usuario:         { select: { nombre: true, rol: true } },
+    },
+  });
 
   const statsPorTipo = ["ENTRADA", "SALIDA", "TRANSFERENCIA", "AJUSTE"].map((tipo) => ({
     tipo,
@@ -70,11 +50,7 @@ export default async function HistorialPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-ink">Historial de actividad</h1>
-        <p className="mt-0.5 text-sm text-fade">
-          {esAdmin
-            ? "Todos los movimientos de la empresa"
-            : `Movimientos de ${sucursalPropia?.nombre ?? "tu sucursal"}`}
-        </p>
+        <p className="mt-0.5 text-sm text-fade">Todos los movimientos de la empresa</p>
       </header>
 
       {/* Stats */}

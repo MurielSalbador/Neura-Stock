@@ -13,6 +13,31 @@ const schema = z.object({
   stockMinimo: z.coerce.number().min(0),
 });
 
+export async function eliminarProducto(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  if (user.rol !== "ADMIN") return;
+
+  const id = formData.get("id") as string;
+  if (!id) return;
+
+  const prod = await prisma.producto.findFirst({
+    where: { id, empresaId: user.empresaId },
+  });
+  if (!prod) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.ventaItem.deleteMany({ where: { productoId: id } });
+    await tx.compraItem.deleteMany({ where: { productoId: id } });
+    await tx.movimiento.deleteMany({ where: { productoId: id } });
+    await tx.stock.deleteMany({ where: { productoId: id } });
+    await tx.producto.delete({ where: { id } });
+  });
+
+  revalidatePath("/app/productos");
+  revalidatePath("/app/stock");
+  revalidatePath("/app");
+}
+
 export async function crearProducto(formData: FormData) {
   const user = await requireUser();
   const parsed = schema.safeParse({

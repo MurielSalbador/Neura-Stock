@@ -95,6 +95,7 @@ export default async function DashboardPage() {
         producto: { select: { nombre: true } },
         sucursalOrigen: { select: { nombre: true } },
         sucursalDestino: { select: { nombre: true } },
+        usuario: { select: { nombre: true, rol: true } },
       },
     }),
     // Last 7 days — for sparklines
@@ -148,8 +149,6 @@ export default async function DashboardPage() {
 
   const movsEstaSemanana      = movsLast7.length;
   const productosEstaSemanana = productosLast7.length;
-
-  const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
   return (
     <div className="space-y-6">
@@ -272,6 +271,7 @@ export default async function DashboardPage() {
               const style = TIPO_STYLE[m.tipo] ?? { bg: "bg-ghost/15", text: "text-fade" };
               const signo = m.tipo === "ENTRADA" ? "+" : m.tipo === "SALIDA" ? "-" : "";
               const sucursal = m.sucursalDestino?.nombre ?? m.sucursalOrigen?.nombre ?? "—";
+              const performerInicial = (m.usuario?.nombre ?? "?").charAt(0).toUpperCase();
               return (
                 <div key={m.id} className="flex items-center gap-3 px-5 py-3">
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
@@ -299,9 +299,15 @@ export default async function DashboardPage() {
                       {signo}{Number(m.cantidad)} unidades
                     </p>
                   </div>
-                  <p className="shrink-0 text-xs text-fade">{formatFecha(m.creadoEn)}</p>
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neon text-[11px] font-bold text-canvas">
-                    {inicial}
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-fade">{formatFecha(m.creadoEn)}</p>
+                    <p className="text-[10px] text-ghost">{m.usuario?.nombre ?? "—"}</p>
+                  </div>
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neon text-[11px] font-bold text-canvas"
+                    title={m.usuario?.nombre ?? "desconocido"}
+                  >
+                    {performerInicial}
                   </div>
                 </div>
               );

@@ -113,3 +113,37 @@ export async function eliminarUsuario(formData: FormData): Promise<void> {
   await prisma.usuario.delete({ where: { id: usuarioId } });
   revalidatePath("/app/admin");
 }
+
+export async function limpiarMovimientos(_formData: FormData): Promise<void> {
+  const admin = await requireUser();
+  if (admin.rol !== "ADMIN") return;
+
+  await prisma.$transaction([
+    prisma.stock.deleteMany({ where: { empresaId: admin.empresaId } }),
+    prisma.movimiento.deleteMany({ where: { empresaId: admin.empresaId } }),
+  ]);
+
+  revalidatePath("/app");
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/stock");
+}
+
+export async function limpiarTodo(_formData: FormData): Promise<void> {
+  const admin = await requireUser();
+  if (admin.rol !== "ADMIN") return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.stock.deleteMany({ where: { empresaId: admin.empresaId } });
+    await tx.movimiento.deleteMany({ where: { empresaId: admin.empresaId } });
+    // Ventas y Compras primero para que sus items se eliminen por cascade
+    // antes de borrar productos (FK Restrict en VentaItem/CompraItem → Producto)
+    await tx.venta.deleteMany({ where: { empresaId: admin.empresaId } });
+    await tx.compra.deleteMany({ where: { empresaId: admin.empresaId } });
+    await tx.producto.deleteMany({ where: { empresaId: admin.empresaId } });
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/productos");
+  revalidatePath("/app/movimientos");
+  revalidatePath("/app/stock");
+}

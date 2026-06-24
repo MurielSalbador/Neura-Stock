@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { MovForm } from "./mov-form";
+import { eliminarMovimiento } from "./actions";
 
 const ETIQUETA: Record<string, string> = {
   ENTRADA:       "ENTRADA",
@@ -20,18 +21,11 @@ export default async function MovimientosPage() {
   const user = await requireUser();
   const empresaId = user.empresaId;
   const esVendedor = user.rol === "VENDEDOR";
+  const esAdmin = user.rol === "ADMIN";
 
   const movWhere =
     user.rol === "VENDEDOR"
       ? { empresaId, usuarioId: user.id }
-      : user.rol === "ENCARGADO" && user.sucursalId
-      ? {
-          empresaId,
-          OR: [
-            { sucursalOrigenId: user.sucursalId },
-            { sucursalDestinoId: user.sucursalId },
-          ],
-        }
       : { empresaId };
 
   const [productos, sucursales, movimientos] = await Promise.all([
@@ -106,6 +100,11 @@ export default async function MovimientosPage() {
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Detalle
               </th>
+              {esAdmin && (
+                <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-fade">
+                  Acción
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
@@ -133,11 +132,21 @@ export default async function MovimientosPage() {
                   {m.sucursalDestino?.nombre && `→ ${m.sucursalDestino.nombre}`}
                   {m.motivo && ` · ${m.motivo}`}
                 </td>
+                {esAdmin && (
+                  <td className="px-5 py-3 text-right">
+                    <form action={eliminarMovimiento}>
+                      <input type="hidden" name="id" value={m.id} />
+                      <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                        Borrar
+                      </button>
+                    </form>
+                  </td>
+                )}
               </tr>
             ))}
             {movimientos.length === 0 && (
               <tr>
-                <td colSpan={esVendedor ? 5 : 6} className="px-5 py-12 text-center text-sm text-fade">
+                <td colSpan={esVendedor ? 5 : esAdmin ? 7 : 6} className="px-5 py-12 text-center text-sm text-fade">
                   Sin movimientos todavía
                 </td>
               </tr>
