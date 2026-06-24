@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { alternarUsuario } from "./actions";
+import { alternarUsuario, eliminarUsuario } from "./actions";
 import { RoleSelect } from "./role-select";
 import { AddUserForm } from "./add-user-form";
 
@@ -168,13 +168,21 @@ export default async function AdminPage() {
                         href={`/app/admin/${u.id}`}
                         className="text-xs font-medium text-neon hover:underline"
                       >
-                        Historial
+                        Ver actividad
                       </Link>
                       {puedeModificar && (
                         <form action={alternarUsuario}>
                           <input type="hidden" name="usuarioId" value={u.id} />
                           <button className="text-xs font-medium text-fade underline underline-offset-2 transition-colors hover:text-ink">
                             {u.activo ? "Desactivar" : "Activar"}
+                          </button>
+                        </form>
+                      )}
+                      {esAdmin && !esYo && (
+                        <form action={eliminarUsuario}>
+                          <input type="hidden" name="usuarioId" value={u.id} />
+                          <button className="text-xs font-medium text-danger underline underline-offset-2 transition-colors hover:opacity-70">
+                            Eliminar
                           </button>
                         </form>
                       )}

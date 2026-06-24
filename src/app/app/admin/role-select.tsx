@@ -24,7 +24,7 @@ export function RoleSelect({
         className="cursor-pointer rounded-md border border-rail bg-panel2 px-2 py-1.5 text-xs text-ink transition-colors hover:border-neon/40"
       >
         <option value="VENDEDOR">Vendedor</option>
-        <option value="ENCARGADO">Encargado</option>
+        {esAdmin && <option value="ENCARGADO">Jefe de equipo</option>}
         {esAdmin && <option value="ADMIN">Admin global</option>}
       </select>
     </form>

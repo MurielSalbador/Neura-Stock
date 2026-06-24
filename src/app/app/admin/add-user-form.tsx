@@ -61,7 +61,7 @@ export function AddUserForm({
         className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
       >
         <option value="VENDEDOR">Vendedor</option>
-        <option value="ENCARGADO">Encargado de sucursal</option>
+        {esAdmin && <option value="ENCARGADO">Jefe de equipo</option>}
         {esAdmin && <option value="ADMIN">Admin global</option>}
       </select>
 

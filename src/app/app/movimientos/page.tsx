@@ -19,6 +19,20 @@ const ETIQUETA_COLOR: Record<string, string> = {
 export default async function MovimientosPage() {
   const user = await requireUser();
   const empresaId = user.empresaId;
+  const esVendedor = user.rol === "VENDEDOR";
+
+  const movWhere =
+    user.rol === "VENDEDOR"
+      ? { empresaId, usuarioId: user.id }
+      : user.rol === "ENCARGADO" && user.sucursalId
+      ? {
+          empresaId,
+          OR: [
+            { sucursalOrigenId: user.sucursalId },
+            { sucursalDestinoId: user.sucursalId },
+          ],
+        }
+      : { empresaId };
 
   const [productos, sucursales, movimientos] = await Promise.all([
     prisma.producto.findMany({
@@ -32,13 +46,14 @@ export default async function MovimientosPage() {
       select: { id: true, nombre: true },
     }),
     prisma.movimiento.findMany({
-      where: { empresaId },
+      where: movWhere,
       orderBy: { creadoEn: "desc" },
-      take: 20,
+      take: 50,
       include: {
-        producto: { select: { nombre: true } },
-        sucursalOrigen: { select: { nombre: true } },
+        producto:        { select: { nombre: true } },
+        sucursalOrigen:  { select: { nombre: true } },
         sucursalDestino: { select: { nombre: true } },
+        usuario:         { select: { nombre: true } },
       },
     }),
   ]);
@@ -48,7 +63,9 @@ export default async function MovimientosPage() {
       <header>
         <h1 className="text-2xl font-bold text-ink">Movimientos</h1>
         <p className="mt-0.5 text-sm text-fade">
-          Cada movimiento actualiza el stock · fuente de verdad
+          {esVendedor
+            ? "Tus movimientos registrados"
+            : "Cada movimiento actualiza el stock · fuente de verdad"}
         </p>
       </header>
 
@@ -81,6 +98,11 @@ export default async function MovimientosPage() {
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Cant.
               </th>
+              {!esVendedor && (
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
+                  Usuario
+                </th>
+              )}
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">
                 Detalle
               </th>
@@ -101,6 +123,11 @@ export default async function MovimientosPage() {
                 </td>
                 <td className="px-5 py-3 font-semibold text-ink">{m.producto.nombre}</td>
                 <td className="px-5 py-3 font-bold text-success">{Number(m.cantidad)}</td>
+                {!esVendedor && (
+                  <td className="px-5 py-3 text-xs text-fade">
+                    {m.usuario?.nombre ?? <span className="text-ghost">—</span>}
+                  </td>
+                )}
                 <td className="px-5 py-3 text-xs text-fade">
                   {m.sucursalOrigen?.nombre && `desde ${m.sucursalOrigen.nombre} `}
                   {m.sucursalDestino?.nombre && `→ ${m.sucursalDestino.nombre}`}
@@ -110,7 +137,7 @@ export default async function MovimientosPage() {
             ))}
             {movimientos.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-sm text-fade">
+                <td colSpan={esVendedor ? 5 : 6} className="px-5 py-12 text-center text-sm text-fade">
                   Sin movimientos todavía
                 </td>
               </tr>

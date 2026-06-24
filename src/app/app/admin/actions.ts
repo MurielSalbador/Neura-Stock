@@ -24,9 +24,9 @@ export async function crearUsuario(
   if (!email || !nombre || !password) return { error: "Nombre, email y contraseña son requeridos" };
   if (password.length < 6)            return { error: "La contraseña debe tener al menos 6 caracteres" };
 
-  // ENCARGADO: can only create VENDEDOR or ENCARGADO in their own sucursal
+  // ENCARGADO: can only create VENDEDOR in their own sucursal
   if (admin.rol === "ENCARGADO") {
-    if (rolInput === "ADMIN") return { error: "No podés crear administradores globales" };
+    if (rolInput !== "VENDEDOR") return { error: "Solo podés crear vendedores" };
     sucursalId = admin.sucursalId ?? null;
   }
 
@@ -95,5 +95,21 @@ export async function alternarUsuario(formData: FormData): Promise<void> {
     where: { id: usuarioId },
     data: { activo: !target.activo },
   });
+  revalidatePath("/app/admin");
+}
+
+export async function eliminarUsuario(formData: FormData): Promise<void> {
+  const admin = await requireUser();
+  if (admin.rol !== "ADMIN") return;
+
+  const usuarioId = formData.get("usuarioId") as string;
+  if (usuarioId === admin.id) return;
+
+  const target = await prisma.usuario.findFirst({
+    where: { id: usuarioId, empresaId: admin.empresaId },
+  });
+  if (!target) return;
+
+  await prisma.usuario.delete({ where: { id: usuarioId } });
   revalidatePath("/app/admin");
 }
