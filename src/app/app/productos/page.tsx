@@ -7,11 +7,18 @@ export default async function ProductosPage() {
   const user = await requireUser();
   const esAdmin = user.rol === "ADMIN";
 
-  const productos = await prisma.producto.findMany({
-    where: { empresaId: user.empresaId, activo: true },
-    orderBy: { creadoEn: "desc" },
-    include: { stock: { select: { cantidad: true } } },
-  });
+  const [productos, sucursales] = await Promise.all([
+    prisma.producto.findMany({
+      where: { empresaId: user.empresaId, activo: true },
+      orderBy: { creadoEn: "desc" },
+      include: { stock: { select: { cantidad: true } } },
+    }),
+    prisma.sucursal.findMany({
+      where: { empresaId: user.empresaId, activo: true },
+      orderBy: { creadoEn: "asc" },
+      select: { id: true, nombre: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -55,6 +62,23 @@ export default async function ProductosPage() {
             placeholder="Stock mínimo"
             className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
           />
+          <input
+            name="stockInicial"
+            type="number"
+            step="0.001"
+            min="0"
+            placeholder="Stock actual"
+            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
+          />
+          <select
+            name="sucursalId"
+            className="rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors md:col-span-2"
+          >
+            <option value="">Sucursal (si cargás stock)</option>
+            {sucursales.map((s) => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
           <button className="rounded-lg bg-neon/15 px-4 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25 md:col-span-2">
             + Agregar producto
           </button>
@@ -93,7 +117,7 @@ export default async function ProductosPage() {
                   <td className="px-5 py-3 font-mono text-xs text-fade">{p.sku}</td>
                   <td className="px-5 py-3 font-semibold text-ink">{p.nombre}</td>
                   <td className="px-5 py-3 text-ink">${Number(p.precioVenta).toFixed(2)}</td>
-                  <td className="px-5 py-3 font-bold text-success">{total}</td>
+                  <td className={`px-5 py-3 font-bold ${total < 0 ? "text-danger" : total === 0 ? "text-fade" : "text-success"}`}>{total}</td>
                   {esAdmin && (
                     <td className="px-5 py-3 text-right">
                       <form action={eliminarProducto}>
