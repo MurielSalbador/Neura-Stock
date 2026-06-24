@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { SucursalSelector } from "../sucursal-selector";
+import { ConfirmButton } from "../confirm-button";
+import { eliminarProducto } from "../productos/actions";
 
 export default async function StockPage({
   searchParams,
@@ -8,6 +10,7 @@ export default async function StockPage({
   searchParams: Promise<{ sucursal?: string }>;
 }) {
   const user = await requireUser();
+  const esAdmin = user.rol === "ADMIN";
   const { sucursal: sucursalFiltro } = await searchParams;
   const empresaId = user.empresaId;
 
@@ -78,6 +81,7 @@ export default async function StockPage({
                   Total
                 </th>
               )}
+              {esAdmin && <th className="w-10 px-3 py-3.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-rail">
@@ -104,6 +108,24 @@ export default async function StockPage({
                   {!sucursalEfectiva && (
                     <td className={`px-5 py-3 text-right font-bold ${bajo ? "text-danger" : "text-success"}`}>
                       {total}
+                    </td>
+                  )}
+                  {esAdmin && (
+                    <td className="px-3 py-3 text-right">
+                      <form action={eliminarProducto}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <ConfirmButton
+                          mensaje={`¿Eliminar "${p.nombre}"? Se borrarán todos sus movimientos y stock.`}
+                          className="text-ghost transition-colors hover:text-danger"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </ConfirmButton>
+                      </form>
                     </td>
                   )}
                 </tr>
