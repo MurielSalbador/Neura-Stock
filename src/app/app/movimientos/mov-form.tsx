@@ -33,14 +33,20 @@ export function MovForm({
   return (
     <form ref={formRef} action={action} className="grid gap-4 md:grid-cols-2">
       {state.error && (
-        <p className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger md:col-span-2">
-          {state.error}
-        </p>
+        <div className="md:col-span-2 flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/8 px-4 py-3">
+          <svg className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f85149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p className="text-sm text-danger">{state.error}</p>
+        </div>
       )}
       {state.ok && (
-        <p className="rounded-lg border border-success/40 bg-success/10 px-4 py-2.5 text-sm text-success md:col-span-2">
-          Movimiento registrado. Stock actualizado.
-        </p>
+        <div className="md:col-span-2 flex items-start gap-3 rounded-lg border border-success/30 bg-success/8 px-4 py-3">
+          <svg className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <p className="text-sm text-success">Movimiento registrado. Stock actualizado.</p>
+        </div>
       )}
 
       <Campo label="Tipo">
@@ -49,7 +55,8 @@ export function MovForm({
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
           disabled={esVendedor}
-          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors disabled:opacity-60"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
         >
           {!esVendedor && <option value="ENTRADA">Entrada (compra / ingreso)</option>}
           <option value="SALIDA">Salida (venta / egreso)</option>
@@ -62,7 +69,8 @@ export function MovForm({
         <select
           name="productoId"
           required
-          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-all appearance-none cursor-pointer"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
         >
           <option value="">Elegí un producto…</option>
           {productos.map((p) => (
@@ -78,13 +86,12 @@ export function MovForm({
           <select
             name="sucursalOrigenId"
             required
-            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
+            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-all appearance-none cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
           >
             <option value="">Elegí…</option>
             {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
+              <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
           </select>
         </Campo>
@@ -95,13 +102,12 @@ export function MovForm({
           <select
             name="sucursalDestinoId"
             required
-            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-colors"
+            className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink transition-all appearance-none cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
           >
             <option value="">Elegí…</option>
             {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
+              <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
           </select>
         </Campo>
@@ -114,7 +120,7 @@ export function MovForm({
           step="0.001"
           required
           placeholder={tipo === "AJUSTE" ? "Ej: -2" : "Ej: 10"}
-          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-all"
         />
       </Campo>
 
@@ -122,14 +128,14 @@ export function MovForm({
         <input
           name="motivo"
           placeholder="Notas..."
-          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-colors"
+          className="w-full rounded-lg border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost transition-all"
         />
       </Campo>
 
-      <div className="md:col-span-2">
+      <div className="md:col-span-2 pt-1">
         <button
           disabled={pending}
-          className="rounded-lg bg-neon/15 px-5 py-2.5 text-sm font-semibold text-neon transition-colors hover:bg-neon/25 disabled:opacity-40"
+          className="group flex items-center gap-2 rounded-lg bg-neon px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-neon/20 transition-all hover:bg-neon/90 hover:shadow-neon/30 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
           onClick={(e) => {
             if (tipo === "TRANSFERENCIA") {
               const form = formRef.current;
@@ -143,7 +149,21 @@ export function MovForm({
             }
           }}
         >
-          {pending ? "Registrando…" : "Registrar movimiento →"}
+          {pending ? (
+            <>
+              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Registrando…
+            </>
+          ) : (
+            <>
+              Registrar movimiento
+              <svg className="transition-transform group-hover:translate-x-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
     </form>
@@ -152,8 +172,8 @@ export function MovForm({
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-fade">{label}</span>
+    <label className="block space-y-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-fade">{label}</span>
       {children}
     </label>
   );

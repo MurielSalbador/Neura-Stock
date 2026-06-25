@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { signOut } from "@/auth";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
+import { LenisWrapper } from "./lenis-wrapper";
 
 const PLAN_LABEL: Record<string, string> = {
   trial:  "Plan Trial",
@@ -111,7 +112,6 @@ async function AsyncUserMenu({
   );
 }
 
-// Simple avatar shown while employee list loads (still functional — has sign-out)
 function UserMenuFallback({
   inicial,
   nombre,
@@ -137,111 +137,112 @@ export default async function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Only one DB query blocks the layout — everything else streams in via Suspense
   const user = await requireUser();
   const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <LenisWrapper>
+      <div className="flex min-h-screen bg-canvas">
 
-      {/* ── Sidebar ── */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-rail bg-panel">
+        {/* ── Sidebar — sticky so it stays while page scrolls ── */}
+        <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-rail bg-panel overflow-y-auto">
 
-        {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-rail px-5 py-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neon/20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-              <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-bold tracking-wide text-ink">NEURA</p>
-            <p className="text-[10px] uppercase tracking-widest text-fade">Stock System</p>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <div className="flex-1 px-3 py-4">
-          <NavLinks rol={user.rol} />
-        </div>
-
-        {/* Historial + Sign out */}
-        <div className="space-y-0.5 border-t border-rail px-3 py-3">
-          {(user.rol === "ENCARGADO" || user.rol === "ADMIN") && (
-            <Link
-              href="/app/historial"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
+          {/* Logo */}
+          <div className="flex items-center gap-3 border-b border-rail px-5 py-5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neon/20">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
               </svg>
-              Historial
-            </Link>
-          )}
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
-          >
-            <button
-              type="submit"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+            </div>
+            <div>
+              <p className="text-sm font-bold tracking-wide text-ink">NEURA</p>
+              <p className="text-[10px] uppercase tracking-widest text-fade">Stock System</p>
+            </div>
+          </div>
+
+          {/* Nav */}
+          <div className="flex-1 px-3 py-4">
+            <NavLinks rol={user.rol} />
+          </div>
+
+          {/* Historial + Sign out */}
+          <div className="space-y-0.5 border-t border-rail px-3 py-3">
+            {(user.rol === "ENCARGADO" || user.rol === "ADMIN") && (
+              <Link
+                href="/app/historial"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Historial
+              </Link>
+            )}
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/login" });
+              }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-              Salir
-            </button>
-          </form>
-        </div>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                Salir
+              </button>
+            </form>
+          </div>
 
-        {/* Plan badge — streams in without blocking */}
-        <div className="border-t border-rail p-4">
-          <Suspense
-            fallback={
-              <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
-                <div className="h-8 w-8 shrink-0 rounded-lg bg-neon/20" />
-                <div className="min-w-0 flex-1">
-                  <div className="h-3 w-20 animate-pulse rounded bg-neon/20" />
-                  <div className="mt-1 h-2.5 w-28 animate-pulse rounded bg-panel2" />
-                </div>
-              </div>
-            }
-          >
-            <PlanBadge
-              empresaId={user.empresaId}
-              displayName={user.name ?? user.email ?? ""}
-            />
-          </Suspense>
-        </div>
-      </aside>
-
-      {/* ── Right side ── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-
-        {/* Top bar — avatar shown immediately, employee list streams in */}
-        <header className="flex items-center gap-4 border-b border-rail bg-panel px-6 py-3">
-          <div className="ml-auto flex items-center gap-3">
+          {/* Plan badge */}
+          <div className="border-t border-rail p-4">
             <Suspense
               fallback={
-                <UserMenuFallback
-                  inicial={inicial}
-                  nombre={user.name ?? "Usuario"}
-                  rol={user.rol?.toLowerCase() ?? "operador"}
-                />
+                <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+                  <div className="h-8 w-8 shrink-0 rounded-lg bg-neon/20" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3 w-20 animate-pulse rounded bg-neon/20" />
+                    <div className="mt-1 h-2.5 w-28 animate-pulse rounded bg-panel2" />
+                  </div>
+                </div>
               }
             >
-              <AsyncUserMenu user={user} inicial={inicial} />
+              <PlanBadge
+                empresaId={user.empresaId}
+                displayName={user.name ?? user.email ?? ""}
+              />
             </Suspense>
           </div>
-        </header>
+        </aside>
 
-        {/* Content */}
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        {/* ── Right side ── */}
+        <div className="flex flex-1 flex-col">
+
+          {/* Top bar — sticky */}
+          <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-rail bg-panel/95 px-6 py-3 backdrop-blur-sm">
+            <div className="ml-auto flex items-center gap-3">
+              <Suspense
+                fallback={
+                  <UserMenuFallback
+                    inicial={inicial}
+                    nombre={user.name ?? "Usuario"}
+                    rol={user.rol?.toLowerCase() ?? "operador"}
+                  />
+                }
+              >
+                <AsyncUserMenu user={user} inicial={inicial} />
+              </Suspense>
+            </div>
+          </header>
+
+          {/* Content */}
+          <main className="flex-1 p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </LenisWrapper>
   );
 }
