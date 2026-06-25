@@ -13,7 +13,7 @@ export default async function ProductosPage() {
     prisma.producto.findMany({
       where: { empresaId: user.empresaId, activo: true },
       orderBy: { creadoEn: "desc" },
-      include: { stock: { select: { cantidad: true } } },
+      include: { stock: { select: { cantidad: true, sucursalId: true } } },
     }),
     prisma.sucursal.findMany({
       where: { empresaId: user.empresaId, activo: true },
@@ -31,6 +31,10 @@ export default async function ProductosPage() {
     precioVenta: Number(p.precioVenta),
     stockMinimo: Number(p.stockMinimo),
     stockTotal: p.stock.reduce((acc, s) => acc + Number(s.cantidad), 0),
+    stockPorSucursal: p.stock.map((s) => ({
+      sucursalId: s.sucursalId,
+      cantidad: Number(s.cantidad),
+    })),
   }));
 
   const unidadesTotal = productosCliente.reduce((acc, p) => acc + p.stockTotal, 0);
@@ -107,6 +111,7 @@ export default async function ProductosPage() {
       {/* Product table */}
       <ProductosTablaCliente
         productos={productosCliente}
+        sucursales={sucursales}
         esAdmin={esAdmin}
         puedeEditar={puedeEditar}
       />

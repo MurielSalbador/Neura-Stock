@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useActionState, useEffect, useRef } from "react";
+import { useState, useMemo, useActionState, useEffect } from "react";
 import { eliminarProducto, editarProducto, type ProductoState } from "./actions";
 
 export type ProductoRow = {
@@ -11,11 +11,14 @@ export type ProductoRow = {
   precioVenta: number;
   stockMinimo: number;
   stockTotal: number;
+  stockPorSucursal: { sucursalId: string; cantidad: number }[];
 };
+
+type Sucursal = { id: string; nombre: string };
 
 const POR_PAGINA = 10;
 
-// ── Edit modal (separate component so useActionState resets on each open) ──
+// ── Edit modal — separate component so useActionState resets on each open ──
 function EditModal({
   producto,
   onClose,
@@ -23,8 +26,7 @@ function EditModal({
   producto: ProductoRow;
   onClose: () => void;
 }) {
-  const INIT: ProductoState = {};
-  const [state, action, pending] = useActionState(editarProducto, INIT);
+  const [state, action, pending] = useActionState(editarProducto, {} as ProductoState);
 
   useEffect(() => {
     if (state.ok) onClose();
@@ -33,9 +35,7 @@ function EditModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="animate-scale-in w-full max-w-lg rounded-2xl border border-rail bg-panel p-6 shadow-2xl">
         <div className="mb-5 flex items-center justify-between">
@@ -69,67 +69,31 @@ function EditModal({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-fade">SKU / código</label>
-              <input
-                name="sku"
-                defaultValue={producto.sku}
-                required
-                className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink"
-              />
+              <input name="sku" defaultValue={producto.sku} required className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-fade">Nombre</label>
-              <input
-                name="nombre"
-                defaultValue={producto.nombre}
-                required
-                className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink"
-              />
+              <input name="nombre" defaultValue={producto.nombre} required className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-fade">Cód. de barras</label>
-              <input
-                name="codigoBarras"
-                defaultValue={producto.codigoBarras ?? ""}
-                placeholder="Opcional"
-                className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost"
-              />
+              <input name="codigoBarras" defaultValue={producto.codigoBarras ?? ""} placeholder="Opcional" className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink placeholder:text-ghost" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-fade">Precio de venta</label>
-              <input
-                name="precioVenta"
-                type="number"
-                step="0.01"
-                defaultValue={producto.precioVenta}
-                required
-                className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink"
-              />
+              <input name="precioVenta" type="number" step="0.01" defaultValue={producto.precioVenta} required className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-fade">Stock mínimo</label>
-              <input
-                name="stockMinimo"
-                type="number"
-                step="0.001"
-                defaultValue={producto.stockMinimo}
-                className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink"
-              />
+              <input name="stockMinimo" type="number" step="0.001" defaultValue={producto.stockMinimo} className="w-full rounded-xl border border-rail bg-panel2 px-3.5 py-2.5 text-sm text-ink" />
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-rail py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
-            >
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-rail py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink">
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="flex-1 rounded-xl bg-neon py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 active:scale-[.98]"
-            >
+            <button type="submit" disabled={pending} className="flex-1 rounded-xl bg-neon py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 active:scale-[.98]">
               {pending ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
@@ -142,24 +106,40 @@ function EditModal({
 // ── Main table component ──
 export function ProductosTablaCliente({
   productos: inicial,
+  sucursales,
   esAdmin,
   puedeEditar,
 }: {
   productos: ProductoRow[];
+  sucursales: Sucursal[];
   esAdmin: boolean;
   puedeEditar: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
+  const [sucursalFiltro, setSucursalFiltro] = useState("");
   const [pagina, setPagina] = useState(1);
   const [editando, setEditando] = useState<ProductoRow | null>(null);
 
+  const hayVariasSucursales = sucursales.length > 1;
+
   const filtrados = useMemo(() => {
-    if (!busqueda.trim()) return inicial;
-    const q = busqueda.toLowerCase();
-    return inicial.filter(
-      (p) => p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
-    );
-  }, [inicial, busqueda]);
+    let result = inicial;
+
+    if (sucursalFiltro) {
+      result = result.filter((p) =>
+        p.stockPorSucursal.some((s) => s.sucursalId === sucursalFiltro),
+      );
+    }
+
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase();
+      result = result.filter(
+        (p) => p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
+      );
+    }
+
+    return result;
+  }, [inicial, busqueda, sucursalFiltro]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
@@ -168,12 +148,13 @@ export function ProductosTablaCliente({
     paginaActual * POR_PAGINA,
   );
 
-  const handleBusqueda = (v: string) => {
-    setBusqueda(v);
-    setPagina(1);
-  };
+  const resetPagina = () => setPagina(1);
 
-  // Build visible page numbers (max 5, centred around current)
+  const handleBusqueda = (v: string) => { setBusqueda(v); resetPagina(); };
+  const handleSucursal = (v: string) => { setSucursalFiltro(v); resetPagina(); };
+
+  const sucursalActiva = sucursales.find((s) => s.id === sucursalFiltro);
+
   const pageNums = useMemo(() => {
     if (totalPaginas <= 5) return Array.from({ length: totalPaginas }, (_, i) => i + 1);
     const start =
@@ -183,12 +164,15 @@ export function ProductosTablaCliente({
     return Array.from({ length: 5 }, (_, i) => start + i);
   }, [totalPaginas, paginaActual]);
 
+  const hayFiltros = busqueda || sucursalFiltro;
+
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-rail bg-panel animate-fade-in-up delay-300">
-        {/* Search bar */}
-        <div className="flex items-center gap-3 border-b border-rail px-4 py-3">
-          <div className="relative flex-1 max-w-xs">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-rail px-4 py-3">
+          {/* Search */}
+          <div className="relative min-w-[180px] flex-1">
             <svg
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost pointer-events-none"
               viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -199,28 +183,85 @@ export function ProductosTablaCliente({
             <input
               value={busqueda}
               onChange={(e) => handleBusqueda(e.target.value)}
-              placeholder="Buscar producto..."
+              placeholder="Buscar por nombre o SKU..."
               className="w-full rounded-xl border border-rail bg-panel2 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ghost"
             />
           </div>
-          {busqueda && (
+
+          {/* Branch filter — only when there are multiple branches */}
+          {hayVariasSucursales && (
+            <div className="relative flex items-center gap-2">
+              <svg
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ghost"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <select
+                value={sucursalFiltro}
+                onChange={(e) => handleSucursal(e.target.value)}
+                className={`rounded-xl border py-2 pl-8 pr-3 text-sm transition-colors ${
+                  sucursalFiltro
+                    ? "border-neon/50 bg-neon/10 text-neon"
+                    : "border-rail bg-panel2 text-ink"
+                }`}
+              >
+                <option value="">Todas las sucursales</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Clear filters */}
+          {hayFiltros && (
             <button
-              onClick={() => handleBusqueda("")}
+              onClick={() => { handleBusqueda(""); handleSucursal(""); }}
               className="text-xs text-fade transition-colors hover:text-ink"
             >
-              Limpiar
+              Limpiar filtros
             </button>
           )}
         </div>
+
+        {/* Active filter badge */}
+        {sucursalActiva && (
+          <div className="flex items-center gap-2 border-b border-rail/50 bg-neon/5 px-4 py-2">
+            <svg className="h-3.5 w-3.5 text-neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            <span className="text-xs text-neon font-medium">{sucursalActiva.nombre}</span>
+            <span className="text-xs text-fade">— mostrando stock de esta sucursal</span>
+            <button
+              onClick={() => handleSucursal("")}
+              className="ml-auto flex h-5 w-5 items-center justify-center rounded-full text-fade transition-colors hover:bg-neon/20 hover:text-neon"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rail bg-panel2/50">
-                {["SKU", "NOMBRE", "PRECIO", "STOCK TOTAL", "ACCIONES"].map((h) => (
+                {[
+                  "SKU",
+                  "NOMBRE",
+                  "PRECIO",
+                  sucursalActiva ? `STOCK · ${sucursalActiva.nombre}` : "STOCK TOTAL",
+                  "ACCIONES",
+                ].map((h, idx) => (
                   <th
-                    key={h}
+                    key={idx}
                     className={`px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-fade ${
                       h === "ACCIONES" ? "text-right" : "text-left"
                     }`}
@@ -232,12 +273,17 @@ export function ProductosTablaCliente({
             </thead>
             <tbody>
               {slice.map((p, i) => {
+                const stockMostrar = sucursalFiltro
+                  ? (p.stockPorSucursal.find((s) => s.sucursalId === sucursalFiltro)?.cantidad ?? 0)
+                  : p.stockTotal;
+
                 const stockBadge =
-                  p.stockTotal <= 0
+                  stockMostrar <= 0
                     ? "bg-danger/15 text-danger"
-                    : p.stockTotal <= p.stockMinimo
+                    : stockMostrar <= p.stockMinimo
                     ? "bg-warn/15 text-warn"
                     : "bg-success/15 text-success";
+
                 return (
                   <tr
                     key={p.id}
@@ -258,7 +304,27 @@ export function ProductosTablaCliente({
                     </td>
 
                     {/* Nombre */}
-                    <td className="px-5 py-4 font-semibold text-ink">{p.nombre}</td>
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-ink">{p.nombre}</p>
+                      {/* Mini branch breakdown when showing total */}
+                      {!sucursalFiltro && hayVariasSucursales && p.stockPorSucursal.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {p.stockPorSucursal.map((s) => {
+                            const nombre = sucursales.find((x) => x.id === s.sucursalId)?.nombre;
+                            if (!nombre) return null;
+                            return (
+                              <span
+                                key={s.sucursalId}
+                                className="inline-flex items-center gap-1 rounded-full bg-panel2 px-2 py-0.5 text-[10px] text-fade"
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-neon/50" />
+                                {nombre}: {s.cantidad}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
 
                     {/* Precio */}
                     <td className="px-5 py-4 text-ink">
@@ -268,7 +334,7 @@ export function ProductosTablaCliente({
                     {/* Stock */}
                     <td className="px-5 py-4">
                       <span className={`inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold ${stockBadge}`}>
-                        {p.stockTotal}
+                        {stockMostrar}
                       </span>
                     </td>
 
@@ -323,16 +389,20 @@ export function ProductosTablaCliente({
                         </svg>
                       </div>
                       <p className="text-sm text-fade">
-                        {busqueda
+                        {sucursalActiva && busqueda
+                          ? `Sin resultados en "${sucursalActiva.nombre}" para "${busqueda}"`
+                          : sucursalActiva
+                          ? `No hay productos con stock registrado en "${sucursalActiva.nombre}"`
+                          : busqueda
                           ? `Sin resultados para "${busqueda}"`
                           : "Todavía no cargaste productos"}
                       </p>
-                      {busqueda && (
+                      {hayFiltros && (
                         <button
-                          onClick={() => handleBusqueda("")}
+                          onClick={() => { handleBusqueda(""); handleSucursal(""); }}
                           className="text-xs text-neon underline underline-offset-2"
                         >
-                          Limpiar búsqueda
+                          Limpiar filtros
                         </button>
                       )}
                     </div>
@@ -355,6 +425,9 @@ export function ProductosTablaCliente({
               de{" "}
               <span className="font-medium text-ink">{filtrados.length}</span>{" "}
               {filtrados.length === 1 ? "producto" : "productos"}
+              {sucursalActiva && (
+                <span className="text-neon"> · {sucursalActiva.nombre}</span>
+              )}
             </p>
 
             {totalPaginas > 1 && (
