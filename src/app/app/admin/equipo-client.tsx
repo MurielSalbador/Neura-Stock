@@ -353,7 +353,7 @@ export function EquipoClient({
 
           {/* Table */}
           <div
-            className="animate-fade-in overflow-hidden rounded-xl border border-rail bg-panel"
+            className="animate-fade-in rounded-xl border border-rail bg-panel"
             style={{ animationDelay: "240ms" }}
           >
             {/* Table header bar */}
@@ -377,10 +377,10 @@ export function EquipoClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-rail bg-panel2">
-                  {["USUARIO", "ROL", "SUCURSAL", "SUCURSALES", "ESTADO", "ACCIONES"].map((col) => (
+                  {["USUARIO", "ROL", "SUCURSAL", "SUCURSALES", "ESTADO", "ACCIONES"].map((col, i, arr) => (
                     <th
                       key={col}
-                      className={`px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-ghost ${col === "ACCIONES" ? "text-right" : "text-left"}`}
+                      className={`px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-ghost ${col === "ACCIONES" ? "text-right" : "text-left"} ${i === 0 ? "rounded-tl-xl" : ""} ${i === arr.length - 1 ? "rounded-tr-xl" : ""}`}
                     >
                       {col}
                     </th>
@@ -394,7 +394,6 @@ export function EquipoClient({
                   const enMiSucursal  = esAdmin || (misIds.length > 0 && misIds.some((mid) => userInBranch(u, mid)));
                   const puedeModif    = !esYo && !esAdminGlobal && enMiSucursal && (esAdmin || u.rol === "VENDEDOR");
                   const tieneMenu     = puedeModif || (esAdmin && !esYo);
-                  const inicial       = (u.nombre ?? u.email).charAt(0).toUpperCase();
 
                   const sEncargado = u.sucursalesEncargado.map((se) => ({ id: se.sucursalId, nombre: se.sucursal.nombre }));
                   const sVendedor  = u.sucursalesEncargado.length > 0
@@ -413,8 +412,14 @@ export function EquipoClient({
                       {/* User */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${esAdminGlobal ? "bg-neon/20 text-neon ring-1 ring-neon/30" : "bg-ghost/15 text-fade"}`}>
-                            {inicial}
+                          <div className="relative shrink-0">
+                            <img
+                              src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(u.nombre ?? u.email)}&radius=50&fontSize=40`}
+                              alt=""
+                              width={36}
+                              height={36}
+                              className={`h-9 w-9 rounded-full ${esAdminGlobal ? "ring-2 ring-neon/40" : ""}`}
+                            />
                             <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-panel ${u.activo ? "bg-success" : "bg-ghost"}`} />
                           </div>
                           <div>
@@ -700,24 +705,35 @@ export function EquipoClient({
             </div>
           </div>
 
-          {/* Branch info */}
+          {/* Branch info — carousel */}
           {sucursalesVisibles.length > 0 && (
             <div className="rounded-xl border border-rail bg-panel p-5">
-              <p className="text-xs font-medium text-fade">Sucursal actual</p>
-              <p className="mb-3 mt-0.5 text-sm font-semibold text-ink">
-                {sucursalesVisibles[0]?.nombre ?? "—"}
-              </p>
-              <div className="space-y-1.5">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-fade">Sucursales</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">
+                    {sucursalesVisibles.length} {sucursalesVisibles.length === 1 ? "sucursal" : "sucursales"}
+                  </p>
+                </div>
+                {sucursalesVisibles.length > 1 && (
+                  <span className="text-[10px] text-ghost">scroll →</span>
+                )}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                 {sucursalesVisibles.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between rounded-lg bg-panel2 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2">
+                  <div
+                    key={s.id}
+                    className="w-[120px] flex-shrink-0 snap-start rounded-xl border border-rail bg-panel2 p-3 transition-colors hover:border-neon/30"
+                  >
+                    <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-neon/10">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                         <polyline points="9 22 9 12 15 12 15 22"/>
                       </svg>
-                      <span className="text-xs text-fade">{s.nombre}</span>
                     </div>
-                    <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-bold uppercase text-success">
+                    <p className="truncate text-xs font-semibold text-ink">{s.nombre}</p>
+                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-bold uppercase text-success">
+                      <span className="h-1 w-1 rounded-full bg-success animate-pulse" />
                       Activa
                     </span>
                   </div>
