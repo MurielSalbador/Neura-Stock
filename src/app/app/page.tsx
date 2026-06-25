@@ -17,6 +17,13 @@ const TIPO_STYLE: Record<string, { bg: string; text: string }> = {
   AJUSTE:        { bg: "bg-ghost/15",   text: "text-fade" },
 };
 
+const BRANCH_COLORS = [
+  { from: "#6d28d9", to: "#8b5cf6", accent: "#a78bfa", iconBg: "rgba(109,40,217,0.18)", border: "rgba(139,92,246,0.22)" },
+  { from: "#c2410c", to: "#f97316", accent: "#fb923c", iconBg: "rgba(234,88,12,0.18)",  border: "rgba(249,115,22,0.22)"  },
+  { from: "#0e7490", to: "#06b6d4", accent: "#22d3ee", iconBg: "rgba(14,116,144,0.18)", border: "rgba(6,182,212,0.22)"   },
+  { from: "#15803d", to: "#22c55e", accent: "#4ade80", iconBg: "rgba(21,128,61,0.18)",  border: "rgba(34,197,94,0.22)"   },
+];
+
 function formatFecha(date: Date): string {
   const ahora = new Date();
   const ayer = new Date(ahora);
@@ -264,6 +271,54 @@ export default async function DashboardPage({
         />
       </div>
 
+      {/* Mis sucursales — hero section for ENCARGADO and VENDEDOR */}
+      {user.rol !== "ADMIN" && sucursalesList.length > 0 && (
+        <div className="rounded-xl border border-rail bg-panel p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="font-semibold text-ink">Mis sucursales</h2>
+            <span className="rounded-full bg-neon/10 px-2 py-0.5 text-xs font-medium text-neon">
+              {sucursalesList.length}
+            </span>
+          </div>
+          <div className={`grid gap-3 ${sucursalesList.length === 1 ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+            {sucursalesList.map((suc, i) => {
+              const c = BRANCH_COLORS[i % BRANCH_COLORS.length];
+              const total = stockPorSucursal.find((s) => s.nombre === suc.nombre)?.total ?? 0;
+              return (
+                <div
+                  key={suc.id}
+                  className="relative overflow-hidden rounded-xl border p-5"
+                  style={{ borderColor: c.border }}
+                >
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.04]"
+                    style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
+                  />
+                  <div className="relative flex items-center gap-4">
+                    <div
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl"
+                      style={{ background: c.iconBg }}
+                    >
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={c.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-fade">{suc.nombre}</p>
+                      <p className="text-5xl font-black leading-none" style={{ color: c.accent }}>
+                        {total}
+                      </p>
+                      <p className="mt-1 text-xs text-fade">unidades en stock</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Branch filter bar — visible para ADMIN y ENCARGADO con múltiples sucursales */}
       {mostrarSelectorSucursal && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rail bg-panel px-5 py-3">
@@ -428,16 +483,17 @@ export default async function DashboardPage({
 /* ── Stock Bar Chart ─────────────────────────────────────────────────────── */
 
 function StockBarChart({ data }: { data: { nombre: string; total: number }[] }) {
+  const totalGeneral = data.reduce((sum, d) => sum + d.total, 0);
   const displayData = data.map((d) => ({ ...d, display: Math.max(d.total, 0) }));
   const maxVal = Math.max(...displayData.map((d) => d.display), 1);
 
-  const H = 130;
-  const chartW = 480;
-  const labelPad = 40;
+  const H = 180;
+  const chartW = 520;
+  const labelPad = 42;
   const innerW = chartW - labelPad;
   const nBars = data.length;
-  const slotW = innerW / nBars;
-  const barW = Math.min(slotW * 0.55, 52);
+  const slotW = nBars > 0 ? innerW / nBars : innerW;
+  const barW = Math.min(slotW * 0.55, 90);
 
   const tickStep = Math.max(Math.ceil(maxVal / 4), 1);
   const ticks = [0, tickStep, tickStep * 2, tickStep * 3, tickStep * 4].filter(
@@ -445,75 +501,113 @@ function StockBarChart({ data }: { data: { nombre: string; total: number }[] }) 
   );
 
   return (
-    <svg viewBox={`0 0 ${chartW} ${H + 38}`} className="w-full">
-      {ticks.map((tick) => {
-        const y = H - (tick / maxVal) * H;
-        return (
-          <g key={tick}>
-            <line
-              x1={labelPad}
-              y1={y}
-              x2={chartW}
-              y2={y}
-              stroke="#21262d"
-              strokeWidth="1"
-              strokeDasharray={tick === 0 ? "0" : "4 3"}
-            />
-            <text x={labelPad - 6} y={y + 4} fill="#484f58" fontSize="10" textAnchor="end">
-              {tick}
-            </text>
-          </g>
-        );
-      })}
-
-      {displayData.map((d, i) => {
-        const barH = d.display > 0 ? Math.max((d.display / maxVal) * H, 4) : 0;
-        const cx = labelPad + slotW * i + slotW / 2;
-        const x = cx - barW / 2;
-        const y = H - barH;
-        const isMax = d.display === maxVal && maxVal > 0;
-
-        return (
-          <g key={d.nombre}>
-            {barH > 0 && (
-              <>
-                <rect
-                  x={x}
-                  y={y}
-                  width={barW}
-                  height={barH}
-                  rx="4"
-                  fill={isMax ? "rgba(139,92,246,0.75)" : "rgba(139,92,246,0.40)"}
-                />
-                <rect
-                  x={x}
-                  y={y}
-                  width={barW}
-                  height={Math.min(3, barH)}
-                  rx="4"
-                  fill="rgba(179,132,255,0.5)"
-                />
-              </>
-            )}
-            <text
-              x={cx}
-              y={barH > 0 ? y - 6 : H - 14}
-              fill={d.total < 0 ? "#f85149" : isMax ? "#e6edf3" : "#8b949e"}
-              fontSize="11"
-              fontWeight={isMax ? "600" : "400"}
-              textAnchor="middle"
+    <div>
+      {/* Branch summary cards */}
+      <div className="mb-5 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+        {data.map((d, i) => {
+          const c = BRANCH_COLORS[i % BRANCH_COLORS.length];
+          return (
+            <div
+              key={d.nombre}
+              className="flex items-center gap-3 rounded-xl border bg-canvas px-4 py-4"
+              style={{ borderColor: c.border }}
             >
-              {d.total}
-            </text>
-            <text x={cx} y={H + 16} fill="#8b949e" fontSize="10" textAnchor="middle">
-              {d.nombre.length > 12 ? d.nombre.slice(0, 11) + "…" : d.nombre}
-            </text>
-          </g>
-        );
-      })}
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: c.iconBg }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c.accent} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-fade">{d.nombre}</p>
+                <p className="mt-0.5 text-2xl font-bold text-ink">{d.total}</p>
+                <p className="text-xs text-fade">unidades</p>
+              </div>
+            </div>
+          );
+        })}
+        {/* Total general */}
+        <div className="flex items-center gap-3 rounded-xl border border-neon/20 bg-canvas px-4 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neon/10">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+              <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs text-fade">Total general</p>
+            <p className="mt-0.5 text-2xl font-bold text-neon">{totalGeneral}</p>
+            <p className="text-xs text-fade">unidades</p>
+          </div>
+        </div>
+      </div>
 
-      <line x1={labelPad} y1={H} x2={chartW} y2={H} stroke="#21262d" strokeWidth="1" />
-    </svg>
+      {/* Y-axis label */}
+      <p className="mb-1 text-xs text-fade">Unidades</p>
+
+      {/* SVG chart */}
+      <svg viewBox={`0 0 ${chartW} ${H + 46}`} className="w-full">
+        <defs>
+          {displayData.map((d, i) => {
+            const c = BRANCH_COLORS[i % BRANCH_COLORS.length];
+            return (
+              <linearGradient key={d.nombre} id={`bgrad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={c.from} stopOpacity="0.9" />
+                <stop offset="100%" stopColor={c.to} stopOpacity="0.55" />
+              </linearGradient>
+            );
+          })}
+        </defs>
+
+        {/* Grid lines */}
+        {ticks.map((tick) => {
+          const y = H - (tick / maxVal) * H;
+          return (
+            <g key={tick}>
+              <line x1={labelPad} y1={y} x2={chartW} y2={y} stroke="#21262d" strokeWidth="1" strokeDasharray={tick === 0 ? "0" : "4 3"} />
+              <text x={labelPad - 6} y={y + 4} fill="#484f58" fontSize="10" textAnchor="end">{tick}</text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {displayData.map((d, i) => {
+          const c = BRANCH_COLORS[i % BRANCH_COLORS.length];
+          const barH = d.display > 0 ? Math.max((d.display / maxVal) * H, 6) : 0;
+          const cx = labelPad + slotW * i + slotW / 2;
+          const x = cx - barW / 2;
+          const y = H - barH;
+
+          return (
+            <g key={d.nombre}>
+              {barH > 0 && (
+                <rect x={x} y={y} width={barW} height={barH} rx="6" fill={`url(#bgrad-${i})`} />
+              )}
+              <text x={cx} y={barH > 0 ? y - 8 : H - 14} fill={c.accent} fontSize="15" fontWeight="700" textAnchor="middle">
+                {d.total}
+              </text>
+              <text x={cx} y={H + 18} fill="#8b949e" fontSize="11" textAnchor="middle">
+                {d.nombre.length > 14 ? d.nombre.slice(0, 13) + "…" : d.nombre}
+              </text>
+              <circle cx={cx} cy={H + 32} r="3.5" fill={c.accent} />
+            </g>
+          );
+        })}
+
+        <line x1={labelPad} y1={H} x2={chartW} y2={H} stroke="#21262d" strokeWidth="1" />
+      </svg>
+
+      {/* Footer info */}
+      <div className="mt-4 flex items-center gap-2 text-xs text-fade">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span>Los valores representan las unidades totales disponibles en cada sucursal.</span>
+      </div>
+    </div>
   );
 }
 
