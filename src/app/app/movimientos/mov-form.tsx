@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { nuevoMovimiento, type MovState } from "./actions";
 
 type Opt = { id: string; nombre: string };
@@ -16,6 +17,7 @@ export function MovForm({
   sucursales: Opt[];
   esVendedor?: boolean;
 }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(nuevoMovimiento, inicial);
   const [tipo, setTipo] = useState(esVendedor ? "SALIDA" : "ENTRADA");
   const formRef = useRef<HTMLFormElement>(null);
@@ -27,6 +29,7 @@ export function MovForm({
     if (state.ok) {
       formRef.current?.reset();
       setTipo(esVendedor ? "SALIDA" : "ENTRADA");
+      router.refresh();
     }
   }, [state.ok, esVendedor]);
 
