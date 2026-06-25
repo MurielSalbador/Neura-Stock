@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { ConfirmButton } from "../confirm-button";
 import { eliminarMovimiento } from "./actions";
 
@@ -20,11 +20,18 @@ const ETIQUETA_COLOR: Record<string, string> = {
 
 const TIPOS = ["ALL", "ENTRADA", "SALIDA", "TRANSFERENCIA", "AJUSTE"] as const;
 const TIPO_LABEL: Record<string, string> = {
-  ALL: "Todos",
-  ENTRADA: "Entrada",
-  SALIDA: "Salida",
+  ALL:           "Todos",
+  ENTRADA:       "Entrada",
+  SALIDA:        "Salida",
   TRANSFERENCIA: "Transferencia",
-  AJUSTE: "Ajuste",
+  AJUSTE:        "Ajuste",
+};
+const TIPO_CHIP_COLOR: Record<string, string> = {
+  ALL:           "border-neon/40 bg-neon/10 text-neon",
+  ENTRADA:       "border-success/40 bg-success/10 text-success",
+  SALIDA:        "border-danger/40 bg-danger/10 text-danger",
+  TRANSFERENCIA: "border-warn/40 bg-warn/10 text-warn",
+  AJUSTE:        "border-ghost/40 bg-ghost/10 text-fade",
 };
 
 export type MovimientoSerial = {
@@ -79,20 +86,6 @@ export function HistorialMovimientos({
 }) {
   const [search, setSearch] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("ALL");
-  const [filtrosOpen, setFiltrosOpen] = useState(false);
-  const filtrosRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (filtrosRef.current && !filtrosRef.current.contains(e.target as Node)) {
-        setFiltrosOpen(false);
-      }
-    }
-    if (filtrosOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filtrosOpen]);
 
   const filtrados = useMemo(() => {
     let result = movimientos;
@@ -141,7 +134,7 @@ export function HistorialMovimientos({
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* Search */}
             <label className="relative flex items-center">
               <svg className="pointer-events-none absolute left-3" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#484f58" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -156,52 +149,22 @@ export function HistorialMovimientos({
               />
             </label>
 
-            {/* Filter dropdown */}
-            <div className="relative" ref={filtrosRef}>
-              <button
-                type="button"
-                onClick={() => setFiltrosOpen((o) => !o)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-                  tipoFiltro !== "ALL"
-                    ? "border-neon/40 bg-neon/10 text-neon"
-                    : "border-rail bg-panel2 text-fade hover:border-neon/30 hover:bg-panel hover:text-ink"
-                }`}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="6" x2="11" y2="6" />
-                  <line x1="4" y1="12" x2="16" y2="12" />
-                  <line x1="4" y1="18" x2="21" y2="18" />
-                </svg>
-                Filtros
-                {tipoFiltro !== "ALL" && (
-                  <span className="rounded bg-neon/20 px-1 py-0.5 text-[9px] font-bold text-neon">
-                    {TIPO_LABEL[tipoFiltro]}
-                  </span>
-                )}
-                <svg
-                  width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  className={`transition-transform ${filtrosOpen ? "rotate-180" : ""}`}
+            {/* Filter chips */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {TIPOS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipoFiltro(t)}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                    tipoFiltro === t
+                      ? TIPO_CHIP_COLOR[t]
+                      : "border-rail bg-panel2 text-fade hover:border-rail/70 hover:text-ink"
+                  }`}
                 >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-
-              {filtrosOpen && (
-                <div className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-xl border border-rail bg-panel shadow-lg shadow-black/20">
-                  {TIPOS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => { setTipoFiltro(t); setFiltrosOpen(false); }}
-                      className={`w-full px-4 py-2.5 text-left text-xs font-medium transition-colors hover:bg-panel2 ${
-                        tipoFiltro === t ? "bg-neon/5 text-neon" : "text-ink"
-                      }`}
-                    >
-                      {TIPO_LABEL[t]}
-                    </button>
-                  ))}
-                </div>
-              )}
+                  {TIPO_LABEL[t]}
+                </button>
+              ))}
             </div>
           </div>
         </div>

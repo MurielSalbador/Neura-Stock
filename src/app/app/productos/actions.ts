@@ -16,6 +16,15 @@ const schema = z.object({
   sucursalId: z.string().optional(),
 });
 
+const schemaEditar = z.object({
+  id: z.string().min(1),
+  sku: z.string().min(1, "Falta el SKU"),
+  nombre: z.string().min(2, "Nombre muy corto"),
+  codigoBarras: z.string().optional(),
+  precioVenta: z.coerce.number().min(0),
+  stockMinimo: z.coerce.number().min(0),
+});
+
 export async function eliminarProducto(formData: FormData): Promise<void> {
   const user = await requireUser();
   if (user.rol !== "ADMIN") return;
@@ -86,5 +95,41 @@ export async function crearProducto(
 
   revalidatePath("/app/productos");
   revalidatePath("/app/stock");
+  return { ok: true };
+}
+
+export async function editarProducto(
+  _prev: ProductoState,
+  formData: FormData,
+): Promise<ProductoState> {
+  const user = await requireUser();
+  if (user.rol === "VENDEDOR") return { error: "Sin permiso para editar productos" };
+
+  const parsed = schemaEditar.safeParse({
+    id: formData.get("id"),
+    sku: formData.get("sku"),
+    nombre: formData.get("nombre"),
+    codigoBarras: formData.get("codigoBarras") || undefined,
+    precioVenta: formData.get("precioVenta") || 0,
+    stockMinimo: formData.get("stockMinimo") || 0,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
+  const { id, ...data } = parsed.data;
+
+  const prod = await prisma.producto.findFirst({
+    where: { id, empresaId: user.empresaId },
+  });
+  if (!prod) return { error: "Producto no encontrado" };
+
+  try {
+    await prisma.producto.update({ where: { id }, data });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo actualizar" };
+  }
+
+  revalidatePath("/app/productos");
+  revalidatePath("/app/stock");
+  revalidatePath("/app");
   return { ok: true };
 }
