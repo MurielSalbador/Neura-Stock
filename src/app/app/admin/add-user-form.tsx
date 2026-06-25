@@ -11,10 +11,12 @@ export function AddUserForm({
   sucursales,
   esAdmin,
   sucursalFijaNombre,
+  onSuccess,
 }: {
   sucursales: Sucursal[];
   esAdmin: boolean;
   sucursalFijaNombre?: string;
+  onSuccess?: () => void;
 }) {
   const [state, action, pending] = useActionState(crearUsuario, inicial);
   const formRef = useRef<HTMLFormElement>(null);
@@ -24,8 +26,9 @@ export function AddUserForm({
     if (state.ok) {
       formRef.current?.reset();
       setRolSeleccionado("VENDEDOR");
+      onSuccess?.();
     }
-  }, [state.ok]);
+  }, [state.ok]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Multi-branch checkboxes when creating VENDEDOR with 2+ branches available
   const mostrarCheckboxes = rolSeleccionado === "VENDEDOR" && sucursales.length > 1;
