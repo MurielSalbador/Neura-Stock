@@ -17,10 +17,6 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  if (!logueado && pathname.startsWith("/app")) {
-    return NextResponse.redirect(new URL("/login", req.nextUrl));
-  }
-
   return NextResponse.next();
 });
 

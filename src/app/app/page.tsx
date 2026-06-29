@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { getOptionalUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { SucursalSelector } from "./sucursal-selector";
 
@@ -66,8 +66,9 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ sucursal?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await getOptionalUser();
   const { sucursal: sucursalFiltro } = await searchParams;
+  if (!user) return <DemoDashboard />;
   const empresaId = user.empresaId;
   const misIds = user.sucursalesIds; // branches del encargado (vacío para ADMIN/VENDEDOR)
 
@@ -698,4 +699,160 @@ function KpiIcon({ name, color }: { name: string; color: string }) {
     default:
       return null;
   }
+}
+
+/* ── Demo Dashboard (vista previa para invitados) ────────────────────────── */
+
+function DemoDashboard() {
+  const demoStock = [
+    { nombre: "Casa Central", total: 1_243 },
+    { nombre: "Sucursal Norte", total: 876 },
+    { nombre: "Depósito", total: 2_104 },
+  ];
+
+  const demoBajos = [
+    { nombre: "Auriculares Bluetooth", stockMinimo: 20, total: 3 },
+    { nombre: "Cable HDMI 2m", stockMinimo: 50, total: 12 },
+    { nombre: "Mouse Inalámbrico", stockMinimo: 15, total: 4 },
+    { nombre: "Teclado USB", stockMinimo: 10, total: 7 },
+  ];
+
+  const demoMovs = [
+    { tipo: "ENTRADA",       sucursal: "Casa Central",   producto: 'Monitor 24"',       cantidad: 10, usuario: "Ana G.",     fecha: "Hoy, 14:32" },
+    { tipo: "SALIDA",        sucursal: "Sucursal Norte", producto: "Cable HDMI 2m",     cantidad: 5,  usuario: "Martín R.",  fecha: "Hoy, 11:15" },
+    { tipo: "TRANSFERENCIA", sucursal: "Depósito",       producto: "Mouse Inalámbrico", cantidad: 20, usuario: "Luis P.",    fecha: "Ayer, 18:00" },
+    { tipo: "ENTRADA",       sucursal: "Depósito",       producto: "Teclado USB",       cantidad: 30, usuario: "Ana G.",     fecha: "Ayer, 09:30" },
+    { tipo: "AJUSTE",        sucursal: "Casa Central",   producto: "Hub USB-C",         cantidad: 2,  usuario: "Martín R.",  fecha: "21/06" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Banner guest */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neon/30 bg-neon/5 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neon/15">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-ink">Estás viendo una vista previa</p>
+            <p className="text-xs text-fade">Los datos son de ejemplo. Iniciá sesión para ver tu negocio real.</p>
+          </div>
+        </div>
+        <Link href="/login" className="shrink-0 rounded-lg bg-neon px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neon/90">
+          Iniciar sesión →
+        </Link>
+      </div>
+
+      <header>
+        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+        <p className="mt-0.5 text-sm text-fade">Resumen general del negocio</p>
+      </header>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiCard titulo="Productos"     valor={47}  href="/login" iconBg="bg-neon/20"     iconColor="#8b5cf6" icon="box"      sparkPath={buildSparkPath([0,1,0,2,3,1,2])}       sparkColor="#8b5cf6" subLabel="+3 esta semana" />
+        <KpiCard titulo="Sucursales"    valor={3}   href="/login" iconBg="bg-info/20"     iconColor="#58a6ff" icon="building" sparkPath={buildSparkPath([3,3,3,3,3,3,3])}       sparkColor="#58a6ff" subLabel="activas" />
+        <KpiCard titulo="Movimientos"   valor={312} href="/login" iconBg="bg-success/20"  iconColor="#3fb950" icon="arrows"   sparkPath={buildSparkPath([12,18,9,24,16,21,19])} sparkColor="#3fb950" subLabel="19 esta semana" />
+        <KpiCard titulo="Alertas stock" valor={4}               iconBg="bg-warn/20"      iconColor="#e3b341" icon="alert"    sparkPath={buildSparkPath([4,4,4,4,4,4,4])}       sparkColor="#e3b341" alerta />
+      </div>
+
+      {/* Mid section */}
+      <div className="grid gap-4 lg:grid-cols-2">
+
+        {/* Productos con stock bajo */}
+        <div className="rounded-xl border border-rail bg-panel">
+          <div className="flex items-center justify-between border-b border-rail px-5 py-4">
+            <div className="flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e3b341" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <h2 className="font-semibold text-ink">Productos con stock bajo</h2>
+            </div>
+            <Link href="/login" className="text-xs font-medium text-neon hover:underline">Ver todos</Link>
+          </div>
+          <div className="divide-y divide-rail">
+            {demoBajos.map((p) => {
+              const critico = p.total <= p.stockMinimo * 0.3;
+              return (
+                <div key={p.nombre} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${critico ? "bg-danger/15 text-danger" : "bg-warn/15 text-warn"}`}>
+                    {p.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{p.nombre}</p>
+                    <p className={`text-xs ${critico ? "text-danger" : "text-warn"}`}>Stock actual: {p.total}</p>
+                  </div>
+                  <p className="shrink-0 text-xs text-fade">Mín: {p.stockMinimo}</p>
+                  <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase ${critico ? "bg-danger/15 text-danger" : "bg-warn/15 text-warn"}`}>
+                    {critico ? "Crítico" : "Bajo"}
+                  </span>
+                  <Link href="/login" className="shrink-0 rounded-lg bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition-colors hover:bg-neon/20">
+                    Reponer
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Últimos movimientos */}
+        <div className="rounded-xl border border-rail bg-panel">
+          <div className="flex items-center justify-between border-b border-rail px-5 py-4">
+            <h2 className="font-semibold text-ink">Últimos movimientos</h2>
+            <Link href="/login" className="text-xs font-medium text-neon hover:underline">Ver todos</Link>
+          </div>
+          <div className="divide-y divide-rail">
+            {demoMovs.map((m, i) => {
+              const style = TIPO_STYLE[m.tipo] ?? { bg: "bg-ghost/15", text: "text-fade" };
+              const signo = m.tipo === "ENTRADA" ? "+" : m.tipo === "SALIDA" ? "-" : "";
+              return (
+                <div key={i} className="flex items-center gap-3 px-5 py-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${style.bg}`}>
+                    {m.tipo === "ENTRADA" ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                    ) : m.tipo === "SALIDA" ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={style.text}><path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" /></svg>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink">{TIPO_LABEL[m.tipo]}</p>
+                    <p className="text-xs text-fade">{m.sucursal}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 text-right">
+                    <p className="truncate text-sm text-ink">{m.producto}</p>
+                    <p className={`text-xs font-medium ${style.text}`}>{signo}{m.cantidad} unidades</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-fade">{m.fecha}</p>
+                    <p className="text-[10px] text-ghost">{m.usuario}</p>
+                  </div>
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neon text-[11px] font-bold text-canvas">
+                    {m.usuario.charAt(0).toUpperCase()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Stock por sucursal */}
+      <div className="rounded-xl border border-rail bg-panel p-5">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-ink">Stock por sucursal</h2>
+            <p className="mt-0.5 text-xs text-fade">Unidades totales en cada depósito</p>
+          </div>
+          <Link href="/login" className="text-xs font-medium text-neon hover:underline">Ver detalle →</Link>
+        </div>
+        <StockBarChart data={demoStock} />
+      </div>
+    </div>
+  );
 }

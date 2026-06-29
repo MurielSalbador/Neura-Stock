@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { getOptionalUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { signOut } from "@/auth";
 import { NavLinks } from "./nav-links";
@@ -137,8 +137,8 @@ export default async function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
-  const inicial = (user.name ?? user.email ?? "U").charAt(0).toUpperCase();
+  const user = await getOptionalUser();
+  const inicial = user ? (user.name ?? user.email ?? "U").charAt(0).toUpperCase() : "";
 
   return (
     <LenisWrapper>
@@ -163,12 +163,12 @@ export default async function PanelLayout({
 
           {/* Nav */}
           <div className="flex-1 px-3 py-4">
-            <NavLinks rol={user.rol} />
+            <NavLinks rol={user?.rol} />
           </div>
 
           {/* Historial + Sign out */}
           <div className="space-y-0.5 border-t border-rail px-3 py-3">
-            {(user.rol === "ENCARGADO" || user.rol === "ADMIN") && (
+            {user && (user.rol === "ENCARGADO" || user.rol === "ADMIN") && (
               <Link
                 href="/app/historial"
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
@@ -180,42 +180,69 @@ export default async function PanelLayout({
                 Historial
               </Link>
             )}
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/login" });
-              }}
-            >
-              <button
-                type="submit"
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+            {user ? (
+              <form
+                action={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/login" });
+                }}
+              >
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fade transition-colors hover:bg-panel2 hover:text-ink"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                  </svg>
+                  Salir
+                </button>
+              </form>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neon transition-colors hover:bg-neon/10"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
                 </svg>
-                Salir
-              </button>
-            </form>
+                Iniciar sesión
+              </Link>
+            )}
           </div>
 
           {/* Plan badge */}
           <div className="border-t border-rail p-4">
-            <Suspense
-              fallback={
-                <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
-                  <div className="h-8 w-8 shrink-0 rounded-lg bg-neon/20" />
-                  <div className="min-w-0 flex-1">
-                    <div className="h-3 w-20 animate-pulse rounded bg-neon/20" />
-                    <div className="mt-1 h-2.5 w-28 animate-pulse rounded bg-panel2" />
+            {user ? (
+              <Suspense
+                fallback={
+                  <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+                    <div className="h-8 w-8 shrink-0 rounded-lg bg-neon/20" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-3 w-20 animate-pulse rounded bg-neon/20" />
+                      <div className="mt-1 h-2.5 w-28 animate-pulse rounded bg-panel2" />
+                    </div>
                   </div>
+                }
+              >
+                <PlanBadge
+                  empresaId={user.empresaId}
+                  displayName={user.name ?? user.email ?? ""}
+                />
+              </Suspense>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl bg-neon/10 px-3 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neon/20">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
                 </div>
-              }
-            >
-              <PlanBadge
-                empresaId={user.empresaId}
-                displayName={user.name ?? user.email ?? ""}
-              />
-            </Suspense>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-ink">Vista previa</p>
+                  <p className="truncate text-[10px] text-fade">Datos de ejemplo</p>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -225,17 +252,29 @@ export default async function PanelLayout({
           {/* Top bar — sticky */}
           <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-rail bg-panel/95 px-6 py-3 backdrop-blur-sm">
             <div className="ml-auto flex items-center gap-3">
-              <Suspense
-                fallback={
-                  <UserMenuFallback
-                    inicial={inicial}
-                    nombre={user.name ?? "Usuario"}
-                    rol={user.rol?.toLowerCase() ?? "operador"}
-                  />
-                }
-              >
-                <AsyncUserMenu user={user} inicial={inicial} />
-              </Suspense>
+              {user ? (
+                <Suspense
+                  fallback={
+                    <UserMenuFallback
+                      inicial={inicial}
+                      nombre={user!.name ?? "Usuario"}
+                      rol={user!.rol?.toLowerCase() ?? "operador"}
+                    />
+                  }
+                >
+                  <AsyncUserMenu user={user!} inicial={inicial} />
+                </Suspense>
+              ) : (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-lg bg-neon px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neon/90"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+                  </svg>
+                  Iniciar sesión
+                </Link>
+              )}
             </div>
           </header>
 

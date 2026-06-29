@@ -35,6 +35,35 @@ export const requireUser = cache(async function requireUserImpl() {
   };
 });
 
+export const getOptionalUser = cache(async function getOptionalUserImpl() {
+  const session = await auth();
+  if (!session?.user?.empresaId) return null;
+
+  const dbUser = await prisma.usuario.findUnique({
+    where: { id: session.user.id },
+    select: {
+      activo: true,
+      rol: true,
+      sucursalId: true,
+      sucursalesEncargado: { select: { sucursalId: true } },
+    },
+  });
+  if (!dbUser || !dbUser.activo) return null;
+
+  const sucursalesIds: string[] = [];
+  if (dbUser.sucursalId) sucursalesIds.push(dbUser.sucursalId);
+  for (const se of dbUser.sucursalesEncargado) {
+    if (!sucursalesIds.includes(se.sucursalId)) sucursalesIds.push(se.sucursalId);
+  }
+
+  return {
+    ...session.user,
+    rol: dbUser.rol,
+    sucursalId: dbUser.sucursalId,
+    sucursalesIds,
+  };
+});
+
 export async function requireAdmin() {
   const user = await requireUser();
   if (user.rol !== "ADMIN") redirect("/app");
