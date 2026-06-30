@@ -26,7 +26,40 @@ export default async function SucursalesPage() {
       </header>
 
       <div className="overflow-hidden rounded-xl border border-rail bg-panel">
-        <table className="w-full text-sm">
+        {/* Mobile card list */}
+        <div className="divide-y divide-rail sm:hidden">
+          {sucursales.map((s) => (
+            <div key={s.id} className="px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-ink">{s.nombre}</p>
+                  <p className="text-xs text-fade">{s.tipo === "LOCAL" ? "Local" : "Depósito"}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                    s.activo ? "bg-success/15 text-success" : "bg-ghost/15 text-ghost"
+                  }`}
+                >
+                  {s.activo ? "Activa" : "Inactiva"}
+                </span>
+              </div>
+              {s.direccion && <p className="mt-1.5 text-xs text-ghost">{s.direccion}</p>}
+              {esAdmin && (
+                <form action={alternarSucursal} className="mt-2">
+                  <input type="hidden" name="id" value={s.id} />
+                  <button className="text-xs font-medium text-fade underline underline-offset-2 transition-colors hover:text-neon">
+                    {s.activo ? "Desactivar" : "Activar"}
+                  </button>
+                </form>
+              )}
+            </div>
+          ))}
+          {sucursales.length === 0 && (
+            <p className="px-5 py-12 text-center text-sm text-fade">No hay sucursales todavía</p>
+          )}
+        </div>
+
+        <table className="hidden w-full text-sm sm:table">
           <thead>
             <tr className="border-b border-rail bg-panel2">
               <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-fade">

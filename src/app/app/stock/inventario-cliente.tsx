@@ -403,8 +403,95 @@ export function InventarioCliente({
           </div>
         </div>
 
+        {/* Mobile card list */}
+        <div className="divide-y divide-rail/40 sm:hidden">
+          {slice.map((p) => {
+            const porSuc = new Map(p.stockPorSucursal.map((s) => [s.sucursalId, s.cantidad]));
+            const total = sucursalEfectiva
+              ? (porSuc.get(sucursalEfectiva) ?? 0)
+              : [...porSuc.values()].reduce((a, b) => a + b, 0);
+            const sinStock = total === 0;
+            const bajo = !sinStock && total <= p.stockMinimo;
+            const variant = getIconVariant(p.nombre);
+
+            return (
+              <div key={p.id} className={`px-4 py-3.5 ${sinStock ? "bg-danger/[0.03]" : bajo ? "bg-warn/[0.03]" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${variant.bg} ${variant.color}`}>
+                    {variant.renderIcon()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate font-semibold ${sinStock ? "text-danger" : bajo ? "text-warn" : "text-ink"}`}>
+                      {p.nombre}
+                    </p>
+                    <p className="font-mono text-[11px] text-ghost">SKU: {p.sku}</p>
+                  </div>
+                  {sinStock ? (
+                    <span className="shrink-0 rounded-full bg-danger/15 px-2 py-1 text-[10px] font-semibold text-danger">Sin stock</span>
+                  ) : bajo ? (
+                    <span className="shrink-0 rounded-full bg-warn/15 px-2 py-1 text-[10px] font-semibold text-warn">Bajo</span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-success/15 px-2 py-1 text-[10px] font-semibold text-success">OK</span>
+                  )}
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 pl-12 text-xs">
+                  {columnas.map((s) => {
+                    const qty = porSuc.get(s.id) ?? 0;
+                    return (
+                      <span key={s.id} className="text-fade">
+                        {s.nombre}: <span className={qty <= 0 ? "font-semibold text-danger" : "text-ink"}>{qty}u</span>
+                      </span>
+                    );
+                  })}
+                  {mostrarTotal && (
+                    <span className="font-semibold text-fade">
+                      Total: <span className={sinStock ? "text-danger" : bajo ? "text-warn" : "text-ink"}>{total}u</span>
+                    </span>
+                  )}
+                </div>
+
+                {esAdmin && (
+                  <div className="mt-2.5 pl-12">
+                    <form action={eliminarProducto}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <button
+                        type="submit"
+                        onClick={(e) => {
+                          if (!confirm(`¿Eliminar "${p.nombre}"? Se borrarán sus movimientos y stock.`)) e.preventDefault();
+                        }}
+                        className="text-xs font-medium text-danger"
+                      >
+                        Eliminar producto
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {filtrados.length === 0 && (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-panel2">
+                <svg className="h-7 w-7 text-ghost" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+              </div>
+              <p className="text-sm text-fade">
+                {busqueda ? `Sin resultados para "${busqueda}"` : "No hay productos con stock en esta sucursal"}
+              </p>
+              {busqueda && (
+                <button onClick={() => handleBusqueda("")} className="text-xs text-neon underline underline-offset-2">
+                  Limpiar búsqueda
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rail bg-panel2/40">

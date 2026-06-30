@@ -6,6 +6,7 @@ import { signOut } from "@/auth";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
 import { LenisWrapper } from "./lenis-wrapper";
+import { MobileMenuProvider, MobileMenuButton, MobileSidebarWrapper } from "./mobile-nav";
 
 const PLAN_LABEL: Record<string, string> = {
   trial:  "Plan Trial",
@@ -142,10 +143,11 @@ export default async function PanelLayout({
 
   return (
     <LenisWrapper>
+      <MobileMenuProvider>
       <div className="flex min-h-screen bg-canvas">
 
-        {/* ── Sidebar — sticky so it stays while page scrolls ── */}
-        <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-rail bg-panel overflow-y-auto">
+        {/* ── Sidebar — sticky on desktop, slide-in drawer on mobile ── */}
+        <MobileSidebarWrapper>
 
           {/* Logo */}
           <div className="flex items-center gap-3 border-b border-rail px-5 py-5">
@@ -244,13 +246,23 @@ export default async function PanelLayout({
               </div>
             )}
           </div>
-        </aside>
+        </MobileSidebarWrapper>
 
         {/* ── Right side ── */}
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
 
           {/* Top bar — sticky */}
-          <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-rail bg-panel/95 px-6 py-3 backdrop-blur-sm">
+          <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-rail bg-panel/95 px-4 py-3 backdrop-blur-sm sm:px-6">
+            <MobileMenuButton />
+            <div className="flex items-center gap-2 lg:hidden">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neon/20">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+                </svg>
+              </div>
+              <p className="text-sm font-bold tracking-wide text-ink">NEURA</p>
+            </div>
             <div className="ml-auto flex items-center gap-3">
               {user ? (
                 <Suspense
@@ -279,9 +291,10 @@ export default async function PanelLayout({
           </header>
 
           {/* Content */}
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 overflow-x-hidden p-4 sm:p-6">{children}</main>
         </div>
       </div>
+      </MobileMenuProvider>
     </LenisWrapper>
   );
 }

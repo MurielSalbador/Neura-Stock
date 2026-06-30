@@ -92,9 +92,9 @@ export function HistorialTable({ rows }: { rows: TableRow[] }) {
           </svg>
           <h2 className="font-semibold text-ink">Actividad registrada</h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           {/* Search */}
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none">
             <svg className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#484f58" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
@@ -104,7 +104,7 @@ export function HistorialTable({ rows }: { rows: TableRow[] }) {
               placeholder="Buscar movimiento..."
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              className="w-52 rounded-lg border border-rail bg-panel2 py-1.5 pl-8 pr-3 text-sm text-ink placeholder:text-ghost transition-colors focus:border-neon/40"
+              className="w-full rounded-lg border border-rail bg-panel2 py-1.5 pl-8 pr-3 text-sm text-ink placeholder:text-ghost transition-colors focus:border-neon/40 sm:w-52"
             />
           </div>
 
@@ -153,8 +153,44 @@ export function HistorialTable({ rows }: { rows: TableRow[] }) {
         </div>
       </div>
 
+      {/* ── Mobile card list ── */}
+      <div className="divide-y divide-rail sm:hidden">
+        {pageRows.length === 0 ? (
+          <div className="px-5 py-16 text-center">
+            <EmptyState isEmpty={rows.length === 0} />
+          </div>
+        ) : (
+          pageRows.map((m) => (
+            <div key={m.id} className="px-4 py-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TIPO_COLOR[m.tipo] ?? "bg-ghost/15 text-fade"}`}>
+                  {TIPO_LABEL[m.tipo] ?? m.tipo}
+                </span>
+                <span className="text-xs text-fade">
+                  {m.fecha} <span className="text-ghost">{m.hora}</span>
+                </span>
+              </div>
+              <p className="mt-2 font-medium text-ink">{m.producto}</p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="text-xs text-fade">{m.detalle || "—"}</p>
+                <span className="shrink-0 font-bold text-ink">{m.cantidad}</span>
+              </div>
+              {m.usuarioNombre && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neon/20 text-[10px] font-bold text-neon">
+                    {m.usuarioInicial}
+                  </div>
+                  <p className="text-xs text-ink">{m.usuarioNombre}</p>
+                  <p className="text-[10px] text-ghost">{m.usuarioRol}</p>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
       {/* ── Table ── */}
-      <table className="w-full text-sm">
+      <table className="hidden w-full text-sm sm:table">
         <thead>
           <tr className="border-b border-rail bg-panel2">
             {(["FECHA", "TIPO", "PRODUCTO", "CANT.", "REALIZADO POR", "DETALLE"] as const).map((h, i) => (

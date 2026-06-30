@@ -134,9 +134,9 @@ export function HistorialMovimientos({
             )}
           </div>
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
             {/* Search */}
-            <label className="relative flex items-center">
+            <label className="relative flex w-full items-center sm:w-auto">
               <svg className="pointer-events-none absolute left-3" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#484f58" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -145,7 +145,7 @@ export function HistorialMovimientos({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar movimiento..."
-                className="w-48 rounded-lg border border-rail bg-panel2 py-2 pl-9 pr-3 text-xs text-ink placeholder:text-ghost transition-colors focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon/20"
+                className="w-full rounded-lg border border-rail bg-panel2 py-2 pl-9 pr-3 text-xs text-ink placeholder:text-ghost transition-colors focus:border-neon focus:outline-none focus:ring-1 focus:ring-neon/20 sm:w-48"
               />
             </label>
 
@@ -169,10 +169,54 @@ export function HistorialMovimientos({
           </div>
         </div>
 
-        {/* Scrollable table */}
+        {/* Scrollable list */}
         <div className="max-h-[480px] overflow-y-auto">
+          {/* Mobile card list */}
           {filtrados.length > 0 && (
-            <table className="w-full text-sm">
+            <div className="divide-y divide-rail sm:hidden">
+              {filtrados.map((m) => (
+                <div key={m.id} className="px-4 py-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${ETIQUETA_COLOR[m.tipo] ?? "bg-ghost/15 text-fade border border-ghost/20"}`}>
+                      {ETIQUETA[m.tipo]}
+                    </span>
+                    <span className="text-xs text-fade">{new Date(m.creadoEn).toLocaleDateString("es-AR")}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="font-medium text-ink">{m.producto.nombre}</p>
+                    <span className="shrink-0 font-bold text-success">{m.cantidad}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-fade">
+                    {m.sucursalOrigen?.nombre && (
+                      <span className="rounded bg-panel2 px-1.5 py-0.5 text-[10px] font-medium text-fade">{m.sucursalOrigen.nombre}</span>
+                    )}
+                    {m.sucursalOrigen && m.sucursalDestino && <span className="text-ghost">→</span>}
+                    {m.sucursalDestino?.nombre && (
+                      <span className="rounded bg-panel2 px-1.5 py-0.5 text-[10px] font-medium text-fade">{m.sucursalDestino.nombre}</span>
+                    )}
+                    {m.motivo && <span className="text-ghost">· {m.motivo}</span>}
+                  </div>
+                  {!esVendedor && m.usuario?.nombre && (
+                    <p className="mt-1.5 text-[10px] text-ghost">Por {m.usuario.nombre}</p>
+                  )}
+                  {esAdmin && (
+                    <form action={eliminarMovimiento} className="mt-2">
+                      <input type="hidden" name="id" value={m.id} />
+                      <ConfirmButton
+                        mensaje="¿Eliminar este movimiento? El stock se revertirá automáticamente."
+                        className="text-xs font-medium text-danger underline underline-offset-2"
+                      >
+                        Borrar
+                      </ConfirmButton>
+                    </form>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filtrados.length > 0 && (
+            <table className="hidden w-full text-sm sm:table">
               <thead>
                 <tr className="sticky top-0 z-[1] border-b border-rail bg-panel2/95 backdrop-blur-sm">
                   <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-widest text-fade">Fecha</th>

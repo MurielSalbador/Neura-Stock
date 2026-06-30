@@ -37,7 +37,7 @@ function EditModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="animate-scale-in w-full max-w-lg rounded-2xl border border-rail bg-panel p-6 shadow-2xl">
+      <div className="animate-scale-in max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-rail bg-panel p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neon/15">
@@ -248,8 +248,122 @@ export function ProductosTablaCliente({
           </div>
         )}
 
+        {/* Mobile card list */}
+        <div className="divide-y divide-rail/40 sm:hidden">
+          {slice.map((p) => {
+            const stockMostrar = sucursalFiltro
+              ? (p.stockPorSucursal.find((s) => s.sucursalId === sucursalFiltro)?.cantidad ?? 0)
+              : p.stockTotal;
+            const stockBadge =
+              stockMostrar <= 0
+                ? "bg-danger/15 text-danger"
+                : stockMostrar <= p.stockMinimo
+                ? "bg-warn/15 text-warn"
+                : "bg-success/15 text-success";
+
+            return (
+              <div key={p.id} className="px-4 py-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neon/10">
+                    <svg className="h-4 w-4 text-neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-ink">{p.nombre}</p>
+                    <p className="font-mono text-[11px] text-ghost">{p.sku}</p>
+                  </div>
+                  <span className={`inline-flex h-7 shrink-0 min-w-[2.5rem] items-center justify-center rounded-full px-2.5 text-xs font-bold ${stockBadge}`}>
+                    {stockMostrar}
+                  </span>
+                </div>
+
+                {!sucursalFiltro && hayVariasSucursales && p.stockPorSucursal.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5 pl-11">
+                    {p.stockPorSucursal.map((s) => {
+                      const nombre = sucursales.find((x) => x.id === s.sucursalId)?.nombre;
+                      if (!nombre) return null;
+                      return (
+                        <span key={s.sucursalId} className="inline-flex items-center gap-1 rounded-full bg-panel2 px-2 py-0.5 text-[10px] text-fade">
+                          <span className="h-1.5 w-1.5 rounded-full bg-neon/50" />
+                          {nombre}: {s.cantidad}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-2.5 flex items-center gap-3 pl-11">
+                  <span className="text-xs text-fade">
+                    ${p.precioVenta.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    {puedeEditar && (
+                      <button
+                        onClick={() => setEditando(p)}
+                        title="Editar producto"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-neon/10 text-neon transition-all active:scale-95"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                    )}
+                    {esAdmin && (
+                      <form action={eliminarProducto}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button
+                          type="submit"
+                          title="Eliminar producto"
+                          onClick={(e) => {
+                            if (!confirm(`¿Eliminar "${p.nombre}"? Se borrarán sus movimientos y stock asociados.`))
+                              e.preventDefault();
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger/10 text-danger transition-all active:scale-95"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {filtrados.length === 0 && (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-panel2">
+                <svg className="h-7 w-7 text-ghost" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path d="m3.29 7 8.71 5 8.71-5M12 22V12" />
+                </svg>
+              </div>
+              <p className="text-sm text-fade">
+                {sucursalActiva && busqueda
+                  ? `Sin resultados en "${sucursalActiva.nombre}" para "${busqueda}"`
+                  : sucursalActiva
+                  ? `No hay productos con stock registrado en "${sucursalActiva.nombre}"`
+                  : busqueda
+                  ? `Sin resultados para "${busqueda}"`
+                  : "Todavía no cargaste productos"}
+              </p>
+              {hayFiltros && (
+                <button onClick={() => { handleBusqueda(""); handleSucursal(""); }} className="text-xs text-neon underline underline-offset-2">
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rail bg-panel2/50">

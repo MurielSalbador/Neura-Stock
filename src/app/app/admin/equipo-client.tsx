@@ -183,10 +183,10 @@ export function EquipoClient({
       {/* Add User Modal */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) setAddModal(false); }}
         >
-          <div className="w-full max-w-lg animate-scale-in rounded-xl border border-rail bg-panel shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-xl border border-rail bg-panel shadow-2xl">
             <div className="flex items-center justify-between border-b border-rail px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neon/10">
@@ -227,7 +227,7 @@ export function EquipoClient({
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* ── Main content ── */}
         <div className="min-w-0 flex-1 space-y-5">
 
@@ -238,7 +238,7 @@ export function EquipoClient({
           </div>
 
           {/* Search + CTA */}
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <svg
                 className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ghost"
@@ -267,7 +267,7 @@ export function EquipoClient({
             </div>
             <button
               onClick={() => setAddModal(true)}
-              className="flex shrink-0 items-center gap-2 rounded-xl bg-neon px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-neon/90 hover:shadow-lg hover:shadow-neon/25 active:scale-95"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-neon px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-neon/90 hover:shadow-lg hover:shadow-neon/25 active:scale-95"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M12 5v14M5 12h14"/>
@@ -289,7 +289,7 @@ export function EquipoClient({
           )}
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             {[
               {
                 label: "Total usuarios",
@@ -334,16 +334,16 @@ export function EquipoClient({
             ].map(({ label, valor, sub, icon, iconCls, valCls }, i) => (
               <div
                 key={label}
-                className="animate-fade-in-up rounded-xl border border-rail bg-panel p-4 transition-all hover:border-neon/20 hover:shadow-md hover:shadow-neon/5"
+                className="animate-fade-in-up rounded-xl border border-rail bg-panel p-2.5 transition-all hover:border-neon/20 hover:shadow-md hover:shadow-neon/5 sm:p-4"
                 style={{ animationDelay: `${i * 80}ms` }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-medium text-fade">{label}</p>
-                    <p className={`mt-1.5 text-3xl font-bold ${valCls}`}>{valor}</p>
-                    <p className="mt-1 text-xs text-ghost">{sub}</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-medium text-fade sm:text-xs">{label}</p>
+                    <p className={`mt-1.5 text-xl font-bold sm:text-3xl ${valCls}`}>{valor}</p>
+                    <p className="mt-1 hidden text-xs text-ghost sm:block">{sub}</p>
                   </div>
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconCls}`}>
+                  <div className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:flex ${iconCls}`}>
                     {icon}
                   </div>
                 </div>
@@ -374,7 +374,153 @@ export function EquipoClient({
               )}
             </div>
 
-            <table className="w-full text-sm">
+            {/* Mobile card list */}
+            <div className="divide-y divide-rail sm:hidden">
+              {filtrados.map((u) => {
+                const esYo          = u.id === sessionUser.id;
+                const esAdminGlobal = u.rol === "ADMIN";
+                const enMiSucursal  = esAdmin || (misIds.length > 0 && misIds.some((mid) => userInBranch(u, mid)));
+                const puedeModif    = !esYo && !esAdminGlobal && enMiSucursal && (esAdmin || u.rol === "VENDEDOR");
+                const tieneMenu     = puedeModif || (esAdmin && !esYo);
+                const sActualesIds = u.sucursalesEncargado.length > 0
+                  ? u.sucursalesEncargado.map((se) => se.sucursalId)
+                  : u.sucursalId ? [u.sucursalId] : [];
+
+                return (
+                  <div key={u.id} className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="relative shrink-0">
+                        <img
+                          src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(u.nombre ?? u.email)}&radius=50&fontSize=40`}
+                          alt=""
+                          width={36}
+                          height={36}
+                          className={`h-9 w-9 rounded-full ${esAdminGlobal ? "ring-2 ring-neon/40" : ""}`}
+                        />
+                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-panel ${u.activo ? "bg-success" : "bg-ghost"}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-medium text-ink">{u.nombre ?? "—"}</p>
+                          {esYo && (
+                            <span className="shrink-0 rounded bg-neon/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-neon">vos</span>
+                          )}
+                        </div>
+                        <p className="truncate text-xs text-fade">{u.email}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${ROL_COLOR[u.rol] ?? "bg-ghost/15 text-fade"}`}>
+                        {ROL_LABEL[u.rol]}
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-12">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${u.activo ? "bg-success/10 text-success" : "bg-ghost/10 text-ghost"}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${u.activo ? "bg-success" : "bg-ghost"}`} />
+                        {u.activo ? "Activo" : "Inactivo"}
+                      </span>
+                      {u.sucursal?.nombre && (
+                        <span className="text-[11px] text-fade">{u.sucursal.nombre}</span>
+                      )}
+                    </div>
+
+                    <div className="mt-2.5 flex items-center gap-3 pl-12">
+                      <Link
+                        href={`/app/admin/${u.id}`}
+                        className="text-xs font-medium text-fade transition-colors hover:text-ink"
+                      >
+                        Actividad
+                      </Link>
+
+                      {puedeModif && (
+                        <EditUserDialog
+                          usuario={{ id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, sucursalId: u.sucursalId }}
+                          sucursalesDisponibles={sucursalesVisibles}
+                          sucursalesActuales={sActualesIds}
+                          esAdmin={esAdmin}
+                        />
+                      )}
+
+                      {tieneMenu && (
+                        <div className="relative z-30 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => setMenuId(openMenuId === u.id ? null : u.id)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-rail text-ghost transition-all hover:border-neon/40 hover:bg-panel2 hover:text-ink"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <circle cx="12" cy="5" r="1.5"/>
+                              <circle cx="12" cy="12" r="1.5"/>
+                              <circle cx="12" cy="19" r="1.5"/>
+                            </svg>
+                          </button>
+
+                          {openMenuId === u.id && (
+                            <div className="absolute right-0 top-full z-40 mt-1.5 min-w-[190px] overflow-hidden rounded-xl border border-rail bg-panel shadow-2xl shadow-black/50 animate-scale-in">
+                              {puedeModif && (
+                                <form action={alternarUsuario}>
+                                  <input type="hidden" name="usuarioId" value={u.id} />
+                                  <button
+                                    type="submit"
+                                    onClick={() => setMenuId(null)}
+                                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-fade transition-colors hover:bg-panel2 hover:text-ink"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      {u.activo
+                                        ? <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>
+                                        : <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></>
+                                      }
+                                    </svg>
+                                    {u.activo ? "Desactivar" : "Activar"}
+                                  </button>
+                                </form>
+                              )}
+                              {esAdmin && !esYo && (
+                                <>
+                                  <div className="my-1 border-t border-rail" />
+                                  <form action={eliminarUsuario}>
+                                    <input type="hidden" name="usuarioId" value={u.id} />
+                                    <ConfirmButton
+                                      mensaje={`¿Eliminar a "${u.nombre ?? u.email}"? Esta acción es irreversible.`}
+                                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-danger transition-colors hover:bg-danger/5"
+                                    >
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
+                                      </svg>
+                                      Eliminar usuario
+                                    </ConfirmButton>
+                                  </form>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filtrados.length === 0 && (
+                <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#484f58" strokeWidth="1.5">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                  </svg>
+                  <p className="text-sm text-ghost">
+                    {query ? `Sin resultados para "${query}"` : "No hay usuarios todavía"}
+                  </p>
+                  {query && (
+                    <button onClick={() => setQuery("")} className="mt-1 text-xs text-neon transition-colors hover:text-neon/70">
+                      Limpiar búsqueda
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <table className="hidden w-full text-sm sm:table">
               <thead>
                 <tr className="border-b border-rail bg-panel2">
                   {["USUARIO", "ROL", "SUCURSAL", "SUCURSALES", "ESTADO", "ACCIONES"].map((col, i, arr) => (
@@ -630,7 +776,7 @@ export function EquipoClient({
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="w-[268px] animate-fade-in shrink-0 space-y-4" style={{ animationDelay: "150ms" }}>
+        <div className="w-full animate-fade-in space-y-4 lg:w-[268px] lg:shrink-0" style={{ animationDelay: "150ms" }}>
 
           {/* Donut chart */}
           <div className="rounded-xl border border-rail bg-panel p-5">
